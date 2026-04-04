@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Gml4Net</RootNamespace>
+    <AssemblyName>Gml4Net</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Gml4Net</PackageId>
+    <Description>A .NET library for parsing Geography Markup Language (GML) documents</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>gml;geography;xml;ogc;gis;geojson;wkt</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gml4Net.Tests" />
+  </ItemGroup>
+
+</Project>
