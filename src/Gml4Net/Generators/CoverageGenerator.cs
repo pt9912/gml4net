@@ -37,6 +37,7 @@ public static class CoverageGenerator
         return element.ToString(prettyPrint ? SaveOptions.None : SaveOptions.DisableFormatting);
     }
 
+    /// <summary>Generates a gmlcov:RectifiedGridCoverage element from the given model.</summary>
     private static XElement GenerateRectifiedGridCoverage(GmlRectifiedGridCoverage coverage)
     {
         var root = CreateCoverageRoot("RectifiedGridCoverage", coverage);
@@ -51,6 +52,7 @@ public static class CoverageGenerator
         return root;
     }
 
+    /// <summary>Generates a gmlcov:GridCoverage element from the given model.</summary>
     private static XElement GenerateGridCoverage(GmlGridCoverage coverage)
     {
         var root = CreateCoverageRoot("GridCoverage", coverage);
@@ -65,6 +67,7 @@ public static class CoverageGenerator
         return root;
     }
 
+    /// <summary>Generates a gmlcov:ReferenceableGridCoverage element from the given model.</summary>
     private static XElement GenerateReferenceableGridCoverage(GmlReferenceableGridCoverage coverage)
     {
         var root = CreateCoverageRoot("ReferenceableGridCoverage", coverage);
@@ -79,6 +82,7 @@ public static class CoverageGenerator
         return root;
     }
 
+    /// <summary>Generates a gmlcov:MultiPointCoverage element from the given model.</summary>
     private static XElement GenerateMultiPointCoverage(GmlMultiPointCoverage coverage)
     {
         var root = CreateCoverageRoot("MultiPointCoverage", coverage);
@@ -102,6 +106,7 @@ public static class CoverageGenerator
 
     // ---- Helpers ----
 
+    /// <summary>Creates the root gmlcov element with standard namespace declarations and optional bounded-by envelope.</summary>
     private static XElement CreateCoverageRoot(string localName, GmlCoverage coverage)
     {
         var root = new XElement(Gmlcov + localName,
@@ -127,6 +132,7 @@ public static class CoverageGenerator
         return root;
     }
 
+    /// <summary>Generates a gml:Grid element with limits and optional axis labels.</summary>
     private static XElement GenerateGrid(GmlGrid grid)
     {
         var gridEl = new XElement(Gml + "Grid",
@@ -143,6 +149,7 @@ public static class CoverageGenerator
         return gridEl;
     }
 
+    /// <summary>Generates a gml:RectifiedGrid element with limits, origin, and offset vectors.</summary>
     private static XElement GenerateRectifiedGrid(GmlRectifiedGrid grid)
     {
         var gridEl = new XElement(Gml + "RectifiedGrid",
@@ -172,6 +179,7 @@ public static class CoverageGenerator
         return gridEl;
     }
 
+    /// <summary>Appends a gml:rangeSet element containing either a DataBlock or File reference.</summary>
     private static void AddRangeSet(XElement root, GmlCoverage coverage)
     {
         if (coverage.RangeSet is null) return;
@@ -192,6 +200,7 @@ public static class CoverageGenerator
         root.Add(rangeSetEl);
     }
 
+    /// <summary>Appends a gmlcov:rangeType element with swe:DataRecord fields describing the coverage bands.</summary>
     private static void AddRangeType(XElement root, GmlCoverage coverage)
     {
         if (coverage.RangeType is null || coverage.RangeType.Fields.Count == 0) return;
@@ -215,6 +224,7 @@ public static class CoverageGenerator
         root.Add(new XElement(Gmlcov + "rangeType", dataRecord));
     }
 
+    /// <summary>Formats a coordinate as a space-separated string using invariant culture.</summary>
     private static string FormatCoord(Model.GmlCoordinate c)
     {
         var result = $"{c.X.ToString(CultureInfo.InvariantCulture)} {c.Y.ToString(CultureInfo.InvariantCulture)}";

@@ -49,6 +49,9 @@ internal static class GeometryParser
         return result;
     }
 
+    /// <summary>
+    /// Parses a GML Point element into a <see cref="GmlPoint"/>.
+    /// </summary>
     private static GmlPoint? ParsePoint(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -89,6 +92,9 @@ internal static class GeometryParser
         return null;
     }
 
+    /// <summary>
+    /// Parses a GML LineString element into a <see cref="GmlLineString"/>.
+    /// </summary>
     private static GmlLineString? ParseLineString(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -109,6 +115,9 @@ internal static class GeometryParser
         return new GmlLineString { Coordinates = coords, SrsName = srsName, Version = version };
     }
 
+    /// <summary>
+    /// Parses a GML LinearRing element into a <see cref="GmlLinearRing"/>.
+    /// </summary>
     private static GmlLinearRing? ParseLinearRing(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -129,6 +138,9 @@ internal static class GeometryParser
         return new GmlLinearRing { Coordinates = coords, SrsName = srsName, Version = version };
     }
 
+    /// <summary>
+    /// Parses a GML Polygon element, including exterior and interior rings, into a <see cref="GmlPolygon"/>.
+    /// </summary>
     private static GmlPolygon? ParsePolygon(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -191,6 +203,9 @@ internal static class GeometryParser
         };
     }
 
+    /// <summary>
+    /// Parses a GML Envelope element with lowerCorner and upperCorner into a <see cref="GmlEnvelope"/>.
+    /// </summary>
     private static GmlEnvelope? ParseEnvelope(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -220,6 +235,9 @@ internal static class GeometryParser
         };
     }
 
+    /// <summary>
+    /// Parses a GML 2 Box element into a <see cref="GmlBox"/>.
+    /// </summary>
     private static GmlBox? ParseBox(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -263,6 +281,9 @@ internal static class GeometryParser
         return null;
     }
 
+    /// <summary>
+    /// Parses a GML 3 Curve element by concatenating its segment coordinates into a <see cref="GmlCurve"/>.
+    /// </summary>
     private static GmlCurve? ParseCurve(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -299,6 +320,9 @@ internal static class GeometryParser
         return new GmlCurve { Coordinates = allCoords, SrsName = srsName, Version = version };
     }
 
+    /// <summary>
+    /// Parses a GML 3 Surface element by extracting its PolygonPatch children into a <see cref="GmlSurface"/>.
+    /// </summary>
     private static GmlSurface? ParseSurface(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -328,6 +352,9 @@ internal static class GeometryParser
         return new GmlSurface { Patches = patches, SrsName = srsName, Version = version };
     }
 
+    /// <summary>
+    /// Parses a GML MultiPoint element from pointMember and pointMembers children.
+    /// </summary>
     private static GmlMultiPoint? ParseMultiPoint(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -358,6 +385,9 @@ internal static class GeometryParser
         return new GmlMultiPoint { Points = points, SrsName = srsName, Version = version };
     }
 
+    /// <summary>
+    /// Parses a GML MultiLineString element from lineStringMember children.
+    /// </summary>
     private static GmlMultiLineString? ParseMultiLineString(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -377,6 +407,9 @@ internal static class GeometryParser
         return new GmlMultiLineString { LineStrings = lineStrings, SrsName = srsName, Version = version };
     }
 
+    /// <summary>
+    /// Parses a GML MultiPolygon element from polygonMember children.
+    /// </summary>
     private static GmlMultiPolygon? ParseMultiPolygon(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -396,6 +429,9 @@ internal static class GeometryParser
         return new GmlMultiPolygon { Polygons = polygons, SrsName = srsName, Version = version };
     }
 
+    /// <summary>
+    /// Parses a GML MultiCurve element, converting LineString and Curve members into a <see cref="GmlMultiLineString"/>.
+    /// </summary>
     private static GmlMultiLineString? ParseMultiCurve(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -428,6 +464,9 @@ internal static class GeometryParser
         return new GmlMultiLineString { LineStrings = lineStrings, SrsName = srsName, Version = version };
     }
 
+    /// <summary>
+    /// Parses a GML MultiSurface element, converting Polygon and Surface members into a <see cref="GmlMultiPolygon"/>.
+    /// </summary>
     private static GmlMultiPolygon? ParseMultiSurface(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -547,6 +586,9 @@ internal static class GeometryParser
 
     // ---- Coordinate extraction helpers ----
 
+    /// <summary>
+    /// Extracts a coordinate list from an element using posList, pos, or coordinates children.
+    /// </summary>
     private static IReadOnlyList<GmlCoordinate>? ParseCoordinateList(XElement element, List<GmlParseIssue> issues)
     {
         var srsDim = XmlHelpers.GetSrsDimension(element);
@@ -606,6 +648,9 @@ internal static class GeometryParser
         return new GmlCoordinate(x, y, z);
     }
 
+    /// <summary>
+    /// Attempts to parse the text content of a coord child element (X, Y, or Z) as a double.
+    /// </summary>
     private static bool TryParseCoordChild(XElement? el, out double value)
     {
         value = 0;

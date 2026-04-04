@@ -11,6 +11,7 @@ namespace Gml4Net.Parser;
 /// </summary>
 internal static class CoverageParser
 {
+    /// <summary>Parses a GML coverage element and returns the corresponding coverage model.</summary>
     internal static GmlCoverage? Parse(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var localName = element.Name.LocalName;
@@ -25,6 +26,7 @@ internal static class CoverageParser
         };
     }
 
+    /// <summary>Parses a RectifiedGridCoverage element into its model representation.</summary>
     private static GmlRectifiedGridCoverage? ParseRectifiedGridCoverage(
         XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
@@ -72,6 +74,7 @@ internal static class CoverageParser
         };
     }
 
+    /// <summary>Parses a GridCoverage element into its model representation.</summary>
     private static GmlGridCoverage? ParseGridCoverage(
         XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
@@ -119,6 +122,7 @@ internal static class CoverageParser
         };
     }
 
+    /// <summary>Parses a ReferenceableGridCoverage element into its model representation.</summary>
     private static GmlReferenceableGridCoverage? ParseReferenceableGridCoverage(
         XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
@@ -167,6 +171,7 @@ internal static class CoverageParser
         };
     }
 
+    /// <summary>Parses a MultiPointCoverage element into its model representation.</summary>
     private static GmlMultiPointCoverage? ParseMultiPointCoverage(
         XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
@@ -201,6 +206,7 @@ internal static class CoverageParser
 
     // ---- Grid parsing ----
 
+    /// <summary>Parses a Grid element including its dimension, limits, and axis labels.</summary>
     private static GmlGrid? ParseGrid(XElement element, List<GmlParseIssue> issues)
     {
         var dimAttr = element.Attribute("dimension");
@@ -250,6 +256,7 @@ internal static class CoverageParser
         };
     }
 
+    /// <summary>Parses a RectifiedGrid element including origin and offset vectors.</summary>
     private static GmlRectifiedGrid? ParseRectifiedGrid(XElement element, List<GmlParseIssue> issues)
     {
         var baseGrid = ParseGrid(element, issues);
@@ -303,6 +310,7 @@ internal static class CoverageParser
         };
     }
 
+    /// <summary>Parses a GridEnvelope element with low and high grid bounds.</summary>
     private static GmlGridEnvelope? ParseGridEnvelope(XElement element, List<GmlParseIssue> issues)
     {
         var lowEl = XmlHelpers.FindGmlChild(element, "low");
@@ -328,6 +336,7 @@ internal static class CoverageParser
 
     // ---- Shared helpers ----
 
+    /// <summary>Parses the boundedBy element and returns its envelope, if present.</summary>
     private static GmlEnvelope? ParseBoundedBy(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var boundedByEl = XmlHelpers.FindGmlChild(element, "boundedBy");
@@ -340,6 +349,7 @@ internal static class CoverageParser
         return null;
     }
 
+    /// <summary>Parses the rangeSet element, extracting data block or file reference content.</summary>
     private static GmlRangeSet? ParseRangeSet(XElement element)
     {
         var rangeSetEl = XmlHelpers.FindGmlChild(element, "rangeSet")
@@ -372,6 +382,7 @@ internal static class CoverageParser
         return new GmlRangeSet { DataBlock = dataBlock, FileReference = fileRef };
     }
 
+    /// <summary>Parses the rangeType element, extracting SWE DataRecord fields.</summary>
     private static GmlRangeType? ParseRangeType(XElement element)
     {
         var rangeTypeEl = XmlHelpers.FindGmlChild(element, "rangeType")
@@ -405,24 +416,28 @@ internal static class CoverageParser
         return new GmlRangeType { Fields = fields };
     }
 
+    /// <summary>Finds the domainSet child element in GML or GMLCOV namespace.</summary>
     private static XElement? FindDomainSet(XElement element)
     {
         return XmlHelpers.FindGmlChild(element, "domainSet")
             ?? FindChildInNamespace(element, GmlNamespaces.Gmlcov, "domainSet");
     }
 
+    /// <summary>Finds a child element by local name in either the GML or GMLCOV namespace.</summary>
     private static XElement? FindGmlOrGmlcovChild(XElement parent, string localName)
     {
         return XmlHelpers.FindGmlChild(parent, localName)
             ?? FindChildInNamespace(parent, GmlNamespaces.Gmlcov, localName);
     }
 
+    /// <summary>Finds a child element matching the given local name and namespace.</summary>
     private static XElement? FindChildInNamespace(XElement parent, string ns, string localName)
     {
         return parent.Elements().FirstOrDefault(e =>
             e.Name.LocalName == localName && e.Name.NamespaceName == ns);
     }
 
+    /// <summary>Parses a whitespace-separated string of integers into a list.</summary>
     private static IReadOnlyList<int> ParseIntList(string text)
     {
         var parts = text.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);

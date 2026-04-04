@@ -101,6 +101,9 @@ public static class GmlParser
         return ParseDocument(doc, issues);
     }
 
+    /// <summary>
+    /// Parses a validated XDocument into a <see cref="GmlParseResult"/>, detecting the GML version and dispatching the root element.
+    /// </summary>
     private static GmlParseResult ParseDocument(XDocument doc, List<GmlParseIssue> issues)
     {
         var root = doc.Root;
@@ -174,6 +177,9 @@ public static class GmlParser
         return new GmlParseResult { Document = document, Issues = issues };
     }
 
+    /// <summary>
+    /// Routes the root element to the appropriate parser based on its namespace and local name.
+    /// </summary>
     private static IGmlRootContent? DispatchRoot(XElement root, GmlVersion version, List<GmlParseIssue> issues)
     {
         var ns = root.Name.NamespaceName;
@@ -209,6 +215,9 @@ public static class GmlParser
         return null;
     }
 
+    /// <summary>
+    /// Determines whether an element appears to be a GML feature by checking for a feature ID or GML geometry descendants.
+    /// </summary>
     private static bool LooksLikeFeature(XElement element)
     {
         // Has a feature ID attribute
@@ -229,6 +238,9 @@ public static class GmlParser
         return false;
     }
 
+    /// <summary>
+    /// Returns true if the local name matches a known GML coverage element type.
+    /// </summary>
     private static bool IsCoverageElement(string localName) => localName is
         "RectifiedGridCoverage" or "GridCoverage" or
         "ReferenceableGridCoverage" or "MultiPointCoverage";

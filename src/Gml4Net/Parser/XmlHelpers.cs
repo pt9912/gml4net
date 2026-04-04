@@ -245,6 +245,9 @@ internal static class XmlHelpers
         return coords;
     }
 
+    /// <summary>
+    /// Attempts to parse a string as a double using invariant culture float formatting.
+    /// </summary>
     private static bool TryParseDouble(string s, out double result) =>
         double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out result);
 }
