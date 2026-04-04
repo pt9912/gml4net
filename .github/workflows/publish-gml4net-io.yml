@@ -1,0 +1,81 @@
+name: Publish Gml4Net.IO
+
+on:
+  push:
+    tags:
+      - "Gml4Net.IO-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version to publish, e.g. 0.2.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-gml4net-io
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish Gml4Net.IO
+    runs-on: ubuntu-latest
+    environment: nuget
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Resolve package version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#Gml4Net.IO-v}"
+          fi
+
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid package version: ${version}" >&2
+            exit 1
+          fi
+
+          echo "value=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build and test release candidate
+        run: docker buildx build --target test -t gml4net:test .
+
+      - name: Pack Gml4Net.IO artifacts
+        run: |
+          rm -rf ./artifacts
+          docker buildx build \
+            --target artifacts \
+            --build-arg PACK_TARGET=src/Gml4Net.IO/Gml4Net.IO.csproj \
+            --build-arg PACKAGE_VERSION=${{ steps.version.outputs.value }} \
+            -o type=local,dest=./artifacts .
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gml4Net.IO-${{ steps.version.outputs.value }}
+          path: artifacts
+          if-no-files-found: error
+
+      - name: Publish Gml4Net.IO to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          test -n "${NUGET_API_KEY}"
+          docker buildx build \
+            --target push \
+            --secret id=nuget_api_key,env=NUGET_API_KEY \
+            --build-arg PACK_TARGET=src/Gml4Net.IO/Gml4Net.IO.csproj \
+            --build-arg PACKAGE_VERSION=${{ steps.version.outputs.value }} .

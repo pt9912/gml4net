@@ -198,6 +198,42 @@ Notes:
 - The current test project uses `coverlet.msbuild`; the 90% gate is enforced via the Docker test stage
 - The library project treats `CS1591` as an error, so missing XML comments on public APIs break the Docker build
 
+## GitHub Actions
+
+The repository includes GitHub Actions workflows that use the same Dockerfile-based pipeline as local development:
+
+- `.github/workflows/ci.yml`
+  - runs on pushes to `main` and on pull requests
+  - executes `docker buildx build --target test -t gml4net:test .`
+- `.github/workflows/publish-gml4net.yml`
+  - publishes the `Gml4Net` package
+  - runs automatically on Git tags matching `Gml4Net-v*`
+  - can also be started manually via `workflow_dispatch`
+- `.github/workflows/publish-gml4net-io.yml`
+  - publishes the `Gml4Net.IO` package
+  - runs automatically on Git tags matching `Gml4Net.IO-v*`
+  - can also be started manually via `workflow_dispatch`
+- both publish workflows validate the package version, run the Docker `test` target, build package-specific NuGet artifacts, upload them as workflow artifacts, and publish to `nuget.org`
+
+Required GitHub repository setup:
+
+- create a repository or environment secret named `NUGET_API_KEY`
+- if you use GitHub environments, the publish workflow targets the `nuget` environment
+- publish tags must use the format `<PackageId>-v<semver>`
+- examples:
+  - `Gml4Net-v0.2.0`
+  - `Gml4Net.IO-v0.2.0`
+
+Example release flow:
+
+```bash
+git tag Gml4Net-v0.2.0
+git push origin Gml4Net-v0.2.0
+
+git tag Gml4Net.IO-v0.2.0
+git push origin Gml4Net.IO-v0.2.0
+```
+
 ## Requirements
 
 - Target: .NET 10.0 (LTS)

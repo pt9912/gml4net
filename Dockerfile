@@ -44,10 +44,12 @@ RUN dotnet test "${SOLUTION}" \
 
 FROM build AS pack
 ARG SOLUTION=GML4Net.sln
+ARG PACK_TARGET=
 ARG CONFIGURATION=Release
 ARG VERSION=
 ARG PACKAGE_VERSION=
 RUN set -eu; \
+    pack_target="${PACK_TARGET:-${SOLUTION}}"; \
     version_args=""; \
     if [ -n "${PACKAGE_VERSION}" ]; then \
         version_args="/p:PackageVersion=${PACKAGE_VERSION} /p:Version=${PACKAGE_VERSION}"; \
@@ -55,7 +57,7 @@ RUN set -eu; \
         version_args="/p:PackageVersion=${VERSION} /p:Version=${VERSION}"; \
     fi; \
     mkdir -p /artifacts; \
-    dotnet pack "${SOLUTION}" -c "${CONFIGURATION}" --no-build -o /artifacts ${version_args}
+    dotnet pack "${pack_target}" -c "${CONFIGURATION}" --no-build -o /artifacts ${version_args}
 
 FROM pack AS push
 ARG NUGET_SOURCE=https://api.nuget.org/v3/index.json
