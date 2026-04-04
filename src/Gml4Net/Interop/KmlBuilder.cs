@@ -22,31 +22,27 @@ public sealed class KmlBuilder : IGmlBuilder<XElement, XElement, XElement>
     // ---- IGmlBuilder implementation ----
 
     /// <inheritdoc />
-    public XElement? BuildPoint(GmlPoint point) => BuildPointCore(point);
+    public XElement? BuildPoint(GmlPoint point) { ArgumentNullException.ThrowIfNull(point); return BuildPointCore(point); }
     /// <inheritdoc />
-    public XElement? BuildLineString(GmlLineString lineString) => BuildLineStringCore(lineString);
+    public XElement? BuildLineString(GmlLineString lineString) { ArgumentNullException.ThrowIfNull(lineString); return BuildLineStringCore(lineString); }
     /// <inheritdoc />
-    public XElement? BuildLinearRing(GmlLinearRing linearRing) => BuildLinearRingCore(linearRing);
+    public XElement? BuildLinearRing(GmlLinearRing linearRing) { ArgumentNullException.ThrowIfNull(linearRing); return BuildLinearRingCore(linearRing); }
     /// <inheritdoc />
-    public XElement? BuildPolygon(GmlPolygon polygon) => BuildPolygonCore(polygon);
+    public XElement? BuildPolygon(GmlPolygon polygon) { ArgumentNullException.ThrowIfNull(polygon); return BuildPolygonCore(polygon); }
     /// <inheritdoc />
-    public XElement? BuildMultiPoint(GmlMultiPoint multiPoint) =>
-        BuildMultiGeometry(multiPoint.Points.Select(p => BuildPointCore(p)).ToArray());
+    public XElement? BuildMultiPoint(GmlMultiPoint multiPoint) { ArgumentNullException.ThrowIfNull(multiPoint); return BuildMultiGeometry(multiPoint.Points.Select(p => BuildPointCore(p)).ToArray()); }
     /// <inheritdoc />
-    public XElement? BuildMultiLineString(GmlMultiLineString multiLineString) =>
-        BuildMultiGeometry(multiLineString.LineStrings.Select(ls => BuildLineStringCore(ls)).ToArray());
+    public XElement? BuildMultiLineString(GmlMultiLineString multiLineString) { ArgumentNullException.ThrowIfNull(multiLineString); return BuildMultiGeometry(multiLineString.LineStrings.Select(ls => BuildLineStringCore(ls)).ToArray()); }
     /// <inheritdoc />
-    public XElement? BuildMultiPolygon(GmlMultiPolygon multiPolygon) =>
-        BuildMultiGeometry(multiPolygon.Polygons.Select(p => BuildPolygonCore(p)).ToArray());
+    public XElement? BuildMultiPolygon(GmlMultiPolygon multiPolygon) { ArgumentNullException.ThrowIfNull(multiPolygon); return BuildMultiGeometry(multiPolygon.Polygons.Select(p => BuildPolygonCore(p)).ToArray()); }
     /// <inheritdoc />
-    public XElement? BuildEnvelope(GmlEnvelope envelope) => BuildPolygonFromBbox(envelope.LowerCorner, envelope.UpperCorner);
+    public XElement? BuildEnvelope(GmlEnvelope envelope) { ArgumentNullException.ThrowIfNull(envelope); return BuildPolygonFromBbox(envelope.LowerCorner, envelope.UpperCorner); }
     /// <inheritdoc />
-    public XElement? BuildBox(GmlBox box) => BuildPolygonFromBbox(box.LowerCorner, box.UpperCorner);
+    public XElement? BuildBox(GmlBox box) { ArgumentNullException.ThrowIfNull(box); return BuildPolygonFromBbox(box.LowerCorner, box.UpperCorner); }
     /// <inheritdoc />
-    public XElement? BuildCurve(GmlCurve curve) => BuildLineStringFromCoords(curve.Coordinates);
+    public XElement? BuildCurve(GmlCurve curve) { ArgumentNullException.ThrowIfNull(curve); return BuildLineStringFromCoords(curve.Coordinates); }
     /// <inheritdoc />
-    public XElement? BuildSurface(GmlSurface surface) =>
-        BuildMultiGeometry(surface.Patches.Select(p => BuildPolygonCore(p)).ToArray());
+    public XElement? BuildSurface(GmlSurface surface) { ArgumentNullException.ThrowIfNull(surface); return BuildMultiGeometry(surface.Patches.Select(p => BuildPolygonCore(p)).ToArray()); }
     /// <inheritdoc />
     public XElement BuildFeature(GmlFeature feature) => Feature(feature);
     /// <inheritdoc />

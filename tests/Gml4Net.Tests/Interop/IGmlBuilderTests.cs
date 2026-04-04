@@ -98,7 +98,48 @@ public class IGmlBuilderTests
     }
 
     [Fact]
-    public void AllBuilders_BuildAllGeometryTypes_ViaInterface()
+    public void GeoJsonBuilder_AllGeometryTypes_ViaInterface()
+    {
+        IGmlBuilder<JsonObject, JsonObject, JsonObject> b = GeoJsonBuilder.Instance;
+        AssertAllGeometryMethodsNotNull(b);
+    }
+
+    [Fact]
+    public void WktBuilder_AllGeometryTypes_ViaInterface()
+    {
+        IGmlBuilder<string, string, string> b = WktBuilder.Instance;
+        AssertAllGeometryMethodsNotNull(b);
+    }
+
+    [Fact]
+    public void KmlBuilder_AllGeometryTypes_ViaInterface()
+    {
+        IGmlBuilder<XElement, XElement, XElement> b = KmlBuilder.Instance;
+        AssertAllGeometryMethodsNotNull(b);
+    }
+
+    [Fact]
+    public void GeoJsonBuilder_BuildPoint_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => GeoJsonBuilder.Instance.BuildPoint(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void WktBuilder_BuildPoint_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => WktBuilder.Instance.BuildPoint(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void KmlBuilder_BuildPoint_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => KmlBuilder.Instance.BuildPoint(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    private static void AssertAllGeometryMethodsNotNull<TG, TF, TC>(IGmlBuilder<TG, TF, TC> b)
     {
         var pt = new GmlPoint { Coordinate = new(1, 2) };
         var ls = new GmlLineString { Coordinates = [new(0, 0), new(1, 1)] };
@@ -112,51 +153,16 @@ public class IGmlBuilderTests
         var mls = new GmlMultiLineString { LineStrings = [ls] };
         var mpoly = new GmlMultiPolygon { Polygons = [poly] };
 
-        // Verify all three builders handle all geometry types without throwing
-        foreach (var builder in new object[] { GeoJsonBuilder.Instance, WktBuilder.Instance, KmlBuilder.Instance })
-        {
-            if (builder is IGmlBuilder<JsonObject, JsonObject, JsonObject> gj)
-            {
-                gj.BuildPoint(pt).Should().NotBeNull();
-                gj.BuildLineString(ls).Should().NotBeNull();
-                gj.BuildLinearRing(lr).Should().NotBeNull();
-                gj.BuildPolygon(poly).Should().NotBeNull();
-                gj.BuildEnvelope(env).Should().NotBeNull();
-                gj.BuildBox(box).Should().NotBeNull();
-                gj.BuildCurve(curve).Should().NotBeNull();
-                gj.BuildSurface(surface).Should().NotBeNull();
-                gj.BuildMultiPoint(mp).Should().NotBeNull();
-                gj.BuildMultiLineString(mls).Should().NotBeNull();
-                gj.BuildMultiPolygon(mpoly).Should().NotBeNull();
-            }
-            else if (builder is IGmlBuilder<string, string, string> wkt)
-            {
-                wkt.BuildPoint(pt).Should().NotBeNull();
-                wkt.BuildLineString(ls).Should().NotBeNull();
-                wkt.BuildLinearRing(lr).Should().NotBeNull();
-                wkt.BuildPolygon(poly).Should().NotBeNull();
-                wkt.BuildEnvelope(env).Should().NotBeNull();
-                wkt.BuildBox(box).Should().NotBeNull();
-                wkt.BuildCurve(curve).Should().NotBeNull();
-                wkt.BuildSurface(surface).Should().NotBeNull();
-                wkt.BuildMultiPoint(mp).Should().NotBeNull();
-                wkt.BuildMultiLineString(mls).Should().NotBeNull();
-                wkt.BuildMultiPolygon(mpoly).Should().NotBeNull();
-            }
-            else if (builder is IGmlBuilder<XElement, XElement, XElement> kml)
-            {
-                kml.BuildPoint(pt).Should().NotBeNull();
-                kml.BuildLineString(ls).Should().NotBeNull();
-                kml.BuildLinearRing(lr).Should().NotBeNull();
-                kml.BuildPolygon(poly).Should().NotBeNull();
-                kml.BuildEnvelope(env).Should().NotBeNull();
-                kml.BuildBox(box).Should().NotBeNull();
-                kml.BuildCurve(curve).Should().NotBeNull();
-                kml.BuildSurface(surface).Should().NotBeNull();
-                kml.BuildMultiPoint(mp).Should().NotBeNull();
-                kml.BuildMultiLineString(mls).Should().NotBeNull();
-                kml.BuildMultiPolygon(mpoly).Should().NotBeNull();
-            }
-        }
+        b.BuildPoint(pt).Should().NotBeNull();
+        b.BuildLineString(ls).Should().NotBeNull();
+        b.BuildLinearRing(lr).Should().NotBeNull();
+        b.BuildPolygon(poly).Should().NotBeNull();
+        b.BuildEnvelope(env).Should().NotBeNull();
+        b.BuildBox(box).Should().NotBeNull();
+        b.BuildCurve(curve).Should().NotBeNull();
+        b.BuildSurface(surface).Should().NotBeNull();
+        b.BuildMultiPoint(mp).Should().NotBeNull();
+        b.BuildMultiLineString(mls).Should().NotBeNull();
+        b.BuildMultiPolygon(mpoly).Should().NotBeNull();
     }
 }

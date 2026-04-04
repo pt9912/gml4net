@@ -19,27 +19,27 @@ public sealed class GeoJsonBuilder : IGmlBuilder<JsonObject, JsonObject, JsonObj
     // ---- IGmlBuilder implementation ----
 
     /// <inheritdoc />
-    public JsonObject? BuildPoint(GmlPoint point) => BuildPointCore(point);
+    public JsonObject? BuildPoint(GmlPoint point) { ArgumentNullException.ThrowIfNull(point); return BuildPointCore(point); }
     /// <inheritdoc />
-    public JsonObject? BuildLineString(GmlLineString lineString) => BuildLineStringCore(lineString);
+    public JsonObject? BuildLineString(GmlLineString lineString) { ArgumentNullException.ThrowIfNull(lineString); return BuildLineStringCore(lineString); }
     /// <inheritdoc />
-    public JsonObject? BuildLinearRing(GmlLinearRing linearRing) => BuildLinearRingCore(linearRing);
+    public JsonObject? BuildLinearRing(GmlLinearRing linearRing) { ArgumentNullException.ThrowIfNull(linearRing); return BuildLinearRingCore(linearRing); }
     /// <inheritdoc />
-    public JsonObject? BuildPolygon(GmlPolygon polygon) => BuildPolygonCore(polygon);
+    public JsonObject? BuildPolygon(GmlPolygon polygon) { ArgumentNullException.ThrowIfNull(polygon); return BuildPolygonCore(polygon); }
     /// <inheritdoc />
-    public JsonObject? BuildMultiPoint(GmlMultiPoint multiPoint) => BuildMultiPointCore(multiPoint);
+    public JsonObject? BuildMultiPoint(GmlMultiPoint multiPoint) { ArgumentNullException.ThrowIfNull(multiPoint); return BuildMultiPointCore(multiPoint); }
     /// <inheritdoc />
-    public JsonObject? BuildMultiLineString(GmlMultiLineString multiLineString) => BuildMultiLineStringCore(multiLineString);
+    public JsonObject? BuildMultiLineString(GmlMultiLineString multiLineString) { ArgumentNullException.ThrowIfNull(multiLineString); return BuildMultiLineStringCore(multiLineString); }
     /// <inheritdoc />
-    public JsonObject? BuildMultiPolygon(GmlMultiPolygon multiPolygon) => BuildMultiPolygonCore(multiPolygon);
+    public JsonObject? BuildMultiPolygon(GmlMultiPolygon multiPolygon) { ArgumentNullException.ThrowIfNull(multiPolygon); return BuildMultiPolygonCore(multiPolygon); }
     /// <inheritdoc />
-    public JsonObject? BuildEnvelope(GmlEnvelope envelope) => BuildBboxPolygon(envelope.LowerCorner, envelope.UpperCorner);
+    public JsonObject? BuildEnvelope(GmlEnvelope envelope) { ArgumentNullException.ThrowIfNull(envelope); return BuildBboxPolygon(envelope.LowerCorner, envelope.UpperCorner); }
     /// <inheritdoc />
-    public JsonObject? BuildBox(GmlBox box) => BuildBboxPolygon(box.LowerCorner, box.UpperCorner);
+    public JsonObject? BuildBox(GmlBox box) { ArgumentNullException.ThrowIfNull(box); return BuildBboxPolygon(box.LowerCorner, box.UpperCorner); }
     /// <inheritdoc />
-    public JsonObject? BuildCurve(GmlCurve curve) => BuildCurveCore(curve);
+    public JsonObject? BuildCurve(GmlCurve curve) { ArgumentNullException.ThrowIfNull(curve); return BuildCurveCore(curve); }
     /// <inheritdoc />
-    public JsonObject? BuildSurface(GmlSurface surface) => BuildSurfaceCore(surface);
+    public JsonObject? BuildSurface(GmlSurface surface) { ArgumentNullException.ThrowIfNull(surface); return BuildSurfaceCore(surface); }
     /// <inheritdoc />
     public JsonObject BuildFeature(GmlFeature feature) => Feature(feature);
     /// <inheritdoc />

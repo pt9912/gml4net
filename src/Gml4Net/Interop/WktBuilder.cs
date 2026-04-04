@@ -19,27 +19,27 @@ public sealed class WktBuilder : IGmlBuilder<string, string, string>
     // ---- IGmlBuilder implementation ----
 
     /// <inheritdoc />
-    public string? BuildPoint(GmlPoint point) => BuildPointCore(point);
+    public string? BuildPoint(GmlPoint point) { ArgumentNullException.ThrowIfNull(point); return BuildPointCore(point); }
     /// <inheritdoc />
-    public string? BuildLineString(GmlLineString lineString) => BuildLineStringCore(lineString);
+    public string? BuildLineString(GmlLineString lineString) { ArgumentNullException.ThrowIfNull(lineString); return BuildLineStringCore(lineString); }
     /// <inheritdoc />
-    public string? BuildLinearRing(GmlLinearRing linearRing) => BuildLinearRingCore(linearRing);
+    public string? BuildLinearRing(GmlLinearRing linearRing) { ArgumentNullException.ThrowIfNull(linearRing); return BuildLinearRingCore(linearRing); }
     /// <inheritdoc />
-    public string? BuildPolygon(GmlPolygon polygon) => BuildPolygonCore(polygon);
+    public string? BuildPolygon(GmlPolygon polygon) { ArgumentNullException.ThrowIfNull(polygon); return BuildPolygonCore(polygon); }
     /// <inheritdoc />
-    public string? BuildMultiPoint(GmlMultiPoint multiPoint) => BuildMultiPointCore(multiPoint);
+    public string? BuildMultiPoint(GmlMultiPoint multiPoint) { ArgumentNullException.ThrowIfNull(multiPoint); return BuildMultiPointCore(multiPoint); }
     /// <inheritdoc />
-    public string? BuildMultiLineString(GmlMultiLineString multiLineString) => BuildMultiLineStringCore(multiLineString);
+    public string? BuildMultiLineString(GmlMultiLineString multiLineString) { ArgumentNullException.ThrowIfNull(multiLineString); return BuildMultiLineStringCore(multiLineString); }
     /// <inheritdoc />
-    public string? BuildMultiPolygon(GmlMultiPolygon multiPolygon) => BuildMultiPolygonCore(multiPolygon);
+    public string? BuildMultiPolygon(GmlMultiPolygon multiPolygon) { ArgumentNullException.ThrowIfNull(multiPolygon); return BuildMultiPolygonCore(multiPolygon); }
     /// <inheritdoc />
-    public string? BuildEnvelope(GmlEnvelope envelope) => BuildBboxWkt(envelope.LowerCorner, envelope.UpperCorner);
+    public string? BuildEnvelope(GmlEnvelope envelope) { ArgumentNullException.ThrowIfNull(envelope); return BuildBboxWkt(envelope.LowerCorner, envelope.UpperCorner); }
     /// <inheritdoc />
-    public string? BuildBox(GmlBox box) => BuildBboxWkt(box.LowerCorner, box.UpperCorner);
+    public string? BuildBox(GmlBox box) { ArgumentNullException.ThrowIfNull(box); return BuildBboxWkt(box.LowerCorner, box.UpperCorner); }
     /// <inheritdoc />
-    public string? BuildCurve(GmlCurve curve) => BuildCurveCore(curve);
+    public string? BuildCurve(GmlCurve curve) { ArgumentNullException.ThrowIfNull(curve); return BuildCurveCore(curve); }
     /// <inheritdoc />
-    public string? BuildSurface(GmlSurface surface) => BuildSurfaceCore(surface);
+    public string? BuildSurface(GmlSurface surface) { ArgumentNullException.ThrowIfNull(surface); return BuildSurfaceCore(surface); }
 
     /// <inheritdoc />
     public string BuildFeature(GmlFeature feature)
