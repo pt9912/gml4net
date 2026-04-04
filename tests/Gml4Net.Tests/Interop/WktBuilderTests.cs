@@ -225,6 +225,82 @@ public class WktBuilderTests
         WktBuilder.Geometry(pt).Should().Be("POINT M (1 2 5)");
     }
 
+    [Fact]
+    public void Geometry_LineStringWithMOnly_ReturnsLineStringM()
+    {
+        var ls = new GmlLineString { Coordinates = [new(0, 0, M: 1), new(1, 1, M: 2)] };
+        WktBuilder.Geometry(ls).Should().Be("LINESTRING M (0 0 1, 1 1 2)");
+    }
+
+    [Fact]
+    public void Geometry_LineStringWithZm_ReturnsLineStringZm()
+    {
+        var ls = new GmlLineString { Coordinates = [new(0, 0, 10, 1), new(1, 1, 20, 2)] };
+        WktBuilder.Geometry(ls).Should().Be("LINESTRING ZM (0 0 10 1, 1 1 20 2)");
+    }
+
+    [Fact]
+    public void Geometry_MultiPointWithMOnly_ReturnsMultiPointM()
+    {
+        var mp = new GmlMultiPoint
+        {
+            Points = [new GmlPoint { Coordinate = new(1, 2, M: 3) }, new GmlPoint { Coordinate = new(4, 5, M: 6) }]
+        };
+        WktBuilder.Geometry(mp).Should().Be("MULTIPOINT M ((1 2 3), (4 5 6))");
+    }
+
+    [Fact]
+    public void Geometry_MultiLineStringWithMOnly_ReturnsMultiLineStringM()
+    {
+        var mls = new GmlMultiLineString
+        {
+            LineStrings = [
+                new GmlLineString { Coordinates = [new(0, 0, M: 1), new(1, 1, M: 2)] },
+                new GmlLineString { Coordinates = [new(2, 2, M: 3), new(3, 3, M: 4)] }
+            ]
+        };
+        WktBuilder.Geometry(mls).Should().Be("MULTILINESTRING M ((0 0 1, 1 1 2), (2 2 3, 3 3 4))");
+    }
+
+    [Fact]
+    public void Geometry_MultiPolygonWith3D_ReturnsMultiPolygonZ()
+    {
+        var mp = new GmlMultiPolygon
+        {
+            Polygons = [new GmlPolygon
+            {
+                Exterior = new GmlLinearRing { Coordinates = [new(0, 0, 1), new(1, 0, 1), new(1, 1, 1), new(0, 0, 1)] }
+            }]
+        };
+        WktBuilder.Geometry(mp).Should().StartWith("MULTIPOLYGON Z (((");
+    }
+
+    [Fact]
+    public void Geometry_MultiPolygonWithMOnly_ReturnsMultiPolygonM()
+    {
+        var mp = new GmlMultiPolygon
+        {
+            Polygons = [new GmlPolygon
+            {
+                Exterior = new GmlLinearRing { Coordinates = [new(0, 0, M: 1), new(1, 0, M: 1), new(1, 1, M: 1), new(0, 0, M: 1)] }
+            }]
+        };
+        WktBuilder.Geometry(mp).Should().StartWith("MULTIPOLYGON M (((");
+    }
+
+    [Fact]
+    public void Geometry_SurfaceWith3D_ReturnsMultiPolygonZ()
+    {
+        var surface = new GmlSurface
+        {
+            Patches = [new GmlPolygon
+            {
+                Exterior = new GmlLinearRing { Coordinates = [new(0, 0, 5), new(1, 0, 5), new(1, 1, 5), new(0, 0, 5)] }
+            }]
+        };
+        WktBuilder.Geometry(surface).Should().StartWith("MULTIPOLYGON Z (((");
+    }
+
     // ---- 3D Polygon with interior ----
 
     [Fact]

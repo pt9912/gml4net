@@ -35,19 +35,23 @@ public static class WktBuilder
         };
     }
 
+    private enum CoordinateLayout
+    {
+        Xy,
+        Xyz,
+        Xym,
+        Xyzm
+    }
+
     // ---- Builders ----
 
-    /// <summary>Builds POINT, POINT Z, or POINT ZM.</summary>
+    /// <summary>Builds POINT, POINT Z, POINT M, or POINT ZM.</summary>
     private static string BuildPoint(GmlPoint p)
     {
         var c = p.Coordinate;
-        if (c.M.HasValue && c.Z.HasValue)
-            return $"POINT ZM ({FormatCoordZM(c)})";
-        if (c.M.HasValue)
-            return $"POINT M ({F(c.X)} {F(c.Y)} {F(c.M.Value)})";
-        if (c.Z.HasValue)
-            return $"POINT Z ({FormatCoord3D(c)})";
-        return $"POINT ({FormatCoord(c)})";
+        var layout = GetLayout(c);
+        var tag = GetTypeTag("POINT", layout);
+        return $"{tag} ({FormatCoord(c, layout)})";
     }
 
     /// <summary>Builds LINESTRING or LINESTRING EMPTY.</summary>
@@ -64,24 +68,28 @@ public static class WktBuilder
         var allCoords = new List<IReadOnlyList<GmlCoordinate>> { poly.Exterior.Coordinates };
         allCoords.AddRange(poly.Interior.Select(h => h.Coordinates));
 
-        var is3D = allCoords.Any(Has3D);
+        var layout = GetLayout(allCoords.SelectMany(r => r));
         var rings = allCoords.Select(r =>
-            $"({(is3D ? FormatCoords3D(r) : FormatCoords(r))})");
+            $"({FormatCoords(r, layout)})");
 
-        var tag = is3D ? "POLYGON Z" : "POLYGON";
+        var tag = GetTypeTag("POLYGON", layout);
         return $"{tag} ({string.Join(", ", rings)})";
     }
 
-    /// <summary>Builds POLYGON rectangle from lower/upper corner, preserving Z.</summary>
+    /// <summary>Builds POLYGON rectangle from lower/upper corner, preserving available ordinates.</summary>
     private static string BuildBboxWkt(GmlCoordinate ll, GmlCoordinate ur)
     {
         var coords = new[]
         {
-            ll, new GmlCoordinate(ur.X, ll.Y, ll.Z), ur, new GmlCoordinate(ll.X, ur.Y, ur.Z), ll
+            ll,
+            new GmlCoordinate(ur.X, ll.Y, ll.Z, ll.M),
+            ur,
+            new GmlCoordinate(ll.X, ur.Y, ur.Z, ur.M),
+            ll
         };
-        var is3D = Has3D(coords);
-        var tag = is3D ? "POLYGON Z" : "POLYGON";
-        return $"{tag} (({(is3D ? FormatCoords3D(coords) : FormatCoords(coords))}))";
+        var layout = GetLayout(coords);
+        var tag = GetTypeTag("POLYGON", layout);
+        return $"{tag} (({FormatCoords(coords, layout)}))";
     }
 
     /// <summary>Builds LINESTRING from Curve (flattened segments).</summary>
@@ -91,84 +99,123 @@ public static class WktBuilder
     /// <summary>Builds MULTIPOLYGON from Surface (polygon patches).</summary>
     private static string BuildSurface(GmlSurface s)
     {
-        var polys = s.Patches.Select(FormatPolygonRings);
-        return $"MULTIPOLYGON ({string.Join(", ", polys)})";
+        var layout = GetLayout(s.Patches.SelectMany(GetPolygonCoordinates));
+        var polys = s.Patches.Select(patch => FormatPolygonRings(patch, layout));
+        return $"{GetTypeTag("MULTIPOLYGON", layout)} ({string.Join(", ", polys)})";
     }
 
     /// <summary>Builds MULTIPOINT.</summary>
     private static string BuildMultiPoint(GmlMultiPoint mp)
     {
-        var is3D = mp.Points.Any(p => p.Coordinate.Z.HasValue);
+        var layout = GetLayout(mp.Points.Select(p => p.Coordinate));
         var points = mp.Points.Select(p =>
-            is3D ? $"({FormatCoord3D(p.Coordinate)})" : $"({FormatCoord(p.Coordinate)})");
-        var tag = is3D ? "MULTIPOINT Z" : "MULTIPOINT";
+            $"({FormatCoord(p.Coordinate, layout)})");
+        var tag = GetTypeTag("MULTIPOINT", layout);
         return $"{tag} ({string.Join(", ", points)})";
     }
 
     /// <summary>Builds MULTILINESTRING.</summary>
     private static string BuildMultiLineString(GmlMultiLineString mls)
     {
-        var is3D = mls.LineStrings.Any(ls => Has3D(ls.Coordinates));
+        var layout = GetLayout(mls.LineStrings.SelectMany(ls => ls.Coordinates));
         var lines = mls.LineStrings.Select(ls =>
-            is3D ? $"({FormatCoords3D(ls.Coordinates)})" : $"({FormatCoords(ls.Coordinates)})");
-        var tag = is3D ? "MULTILINESTRING Z" : "MULTILINESTRING";
+            $"({FormatCoords(ls.Coordinates, layout)})");
+        var tag = GetTypeTag("MULTILINESTRING", layout);
         return $"{tag} ({string.Join(", ", lines)})";
     }
 
     /// <summary>Builds MULTIPOLYGON.</summary>
     private static string BuildMultiPolygon(GmlMultiPolygon mpoly)
     {
-        var polys = mpoly.Polygons.Select(FormatPolygonRings);
-        return $"MULTIPOLYGON ({string.Join(", ", polys)})";
+        var layout = GetLayout(mpoly.Polygons.SelectMany(GetPolygonCoordinates));
+        var polys = mpoly.Polygons.Select(poly => FormatPolygonRings(poly, layout));
+        return $"{GetTypeTag("MULTIPOLYGON", layout)} ({string.Join(", ", polys)})";
     }
 
     // ---- Shared helpers ----
 
     /// <summary>Formats a polygon's exterior + interior rings as WKT ring list.</summary>
-    private static string FormatPolygonRings(GmlPolygon poly)
+    private static string FormatPolygonRings(GmlPolygon poly, CoordinateLayout layout)
     {
         var allCoords = new List<IReadOnlyList<GmlCoordinate>> { poly.Exterior.Coordinates };
         allCoords.AddRange(poly.Interior.Select(h => h.Coordinates));
 
-        var is3D = allCoords.Any(Has3D);
         var rings = allCoords.Select(r =>
-            $"({(is3D ? FormatCoords3D(r) : FormatCoords(r))})");
+            $"({FormatCoords(r, layout)})");
         return $"({string.Join(", ", rings)})";
     }
 
-    /// <summary>Wraps coordinates with a WKT type tag, auto-detecting 3D.</summary>
+    /// <summary>Wraps coordinates with a WKT type tag, auto-detecting XY/XYZ/XYM/XYZM layout.</summary>
     private static string WrapCoords(string typeName, IReadOnlyList<GmlCoordinate> coords)
     {
-        var is3D = Has3D(coords);
-        var tag = is3D ? $"{typeName} Z" : typeName;
-        return $"{tag} ({(is3D ? FormatCoords3D(coords) : FormatCoords(coords))})";
+        var layout = GetLayout(coords);
+        var tag = GetTypeTag(typeName, layout);
+        return $"{tag} ({FormatCoords(coords, layout)})";
     }
 
     // ---- Formatting helpers ----
 
-    /// <summary>Formats a 2D coordinate as "x y".</summary>
-    private static string FormatCoord(GmlCoordinate c) =>
-        $"{F(c.X)} {F(c.Y)}";
+    /// <summary>Formats a coordinate according to the requested XY/XYZ/XYM/XYZM layout.</summary>
+    private static string FormatCoord(GmlCoordinate c, CoordinateLayout layout) => layout switch
+    {
+        CoordinateLayout.Xy => $"{F(c.X)} {F(c.Y)}",
+        CoordinateLayout.Xyz => $"{F(c.X)} {F(c.Y)} {F(c.Z ?? 0)}",
+        CoordinateLayout.Xym => $"{F(c.X)} {F(c.Y)} {F(c.M ?? 0)}",
+        CoordinateLayout.Xyzm => $"{F(c.X)} {F(c.Y)} {F(c.Z ?? 0)} {F(c.M ?? 0)}",
+        _ => throw new ArgumentOutOfRangeException(nameof(layout))
+    };
 
-    /// <summary>Formats a 3D coordinate as "x y z" (pads Z=0 if missing).</summary>
-    private static string FormatCoord3D(GmlCoordinate c) =>
-        $"{F(c.X)} {F(c.Y)} {F(c.Z ?? 0)}";
+    /// <summary>Formats a list of coordinates using the requested XY/XYZ/XYM/XYZM layout.</summary>
+    private static string FormatCoords(IEnumerable<GmlCoordinate> coords, CoordinateLayout layout) =>
+        string.Join(", ", coords.Select(c => FormatCoord(c, layout)));
 
-    /// <summary>Formats a 4D coordinate as "x y z m".</summary>
-    private static string FormatCoordZM(GmlCoordinate c) =>
-        $"{F(c.X)} {F(c.Y)} {F(c.Z ?? 0)} {F(c.M ?? 0)}";
+    /// <summary>Determines the output layout for a coordinate sequence.</summary>
+    private static CoordinateLayout GetLayout(IEnumerable<GmlCoordinate> coords)
+    {
+        var hasZ = false;
+        var hasM = false;
 
-    /// <summary>Formats a list of 2D coordinates as comma-separated pairs.</summary>
-    private static string FormatCoords(IEnumerable<GmlCoordinate> coords) =>
-        string.Join(", ", coords.Select(FormatCoord));
+        foreach (var coord in coords)
+        {
+            hasZ |= coord.Z.HasValue;
+            hasM |= coord.M.HasValue;
+            if (hasZ && hasM)
+                return CoordinateLayout.Xyzm;
+        }
 
-    /// <summary>Formats a list of 3D coordinates as comma-separated triples.</summary>
-    private static string FormatCoords3D(IEnumerable<GmlCoordinate> coords) =>
-        string.Join(", ", coords.Select(FormatCoord3D));
+        if (hasM)
+            return CoordinateLayout.Xym;
+        if (hasZ)
+            return CoordinateLayout.Xyz;
+        return CoordinateLayout.Xy;
+    }
 
-    /// <summary>Returns true if any coordinate in the list has a Z component.</summary>
-    private static bool Has3D(IReadOnlyList<GmlCoordinate> coords) =>
-        coords.Any(c => c.Z.HasValue);
+    /// <summary>Determines the output layout for a single coordinate.</summary>
+    private static CoordinateLayout GetLayout(GmlCoordinate coord) =>
+        GetLayout([coord]);
+
+    /// <summary>Formats a geometry type tag with the required dimension suffix.</summary>
+    private static string GetTypeTag(string typeName, CoordinateLayout layout) => layout switch
+    {
+        CoordinateLayout.Xy => typeName,
+        CoordinateLayout.Xyz => $"{typeName} Z",
+        CoordinateLayout.Xym => $"{typeName} M",
+        CoordinateLayout.Xyzm => $"{typeName} ZM",
+        _ => throw new ArgumentOutOfRangeException(nameof(layout))
+    };
+
+    /// <summary>Enumerates all coordinates of a polygon, including holes.</summary>
+    private static IEnumerable<GmlCoordinate> GetPolygonCoordinates(GmlPolygon polygon)
+    {
+        foreach (var coord in polygon.Exterior.Coordinates)
+            yield return coord;
+
+        foreach (var ring in polygon.Interior)
+        {
+            foreach (var coord in ring.Coordinates)
+                yield return coord;
+        }
+    }
 
     /// <summary>Formats a double using invariant culture.</summary>
     private static string F(double d) =>

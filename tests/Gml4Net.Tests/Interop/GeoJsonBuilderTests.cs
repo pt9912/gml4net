@@ -425,15 +425,26 @@ public class GeoJsonBuilderTests
     }
 
     [Fact]
-    public void Geometry_PointWithMButNoZ_PadsZeroZ()
+    public void Geometry_PointWithMButNoZ_PreservesThreeOrdinatePosition()
     {
         var pt = new GmlPoint { Coordinate = new GmlCoordinate(1, 2, M: 5) };
         var json = GeoJsonBuilder.Geometry(pt)!;
 
         var coords = json["coordinates"]!.AsArray();
-        coords.Should().HaveCount(4); // x, y, 0 (padded Z), m
-        coords[2]!.GetValue<long>().Should().Be(0); // Z padded as integer 0
-        coords[3]!.GetValue<long>().Should().Be(5); // M=5.0 → integer 5
+        coords.Should().HaveCount(3);
+        coords[2]!.GetValue<long>().Should().Be(5);
+    }
+
+    [Fact]
+    public void Geometry_LineStringWithMOnly_PreservesThreeOrdinatePositions()
+    {
+        var line = new GmlLineString { Coordinates = [new(1, 2, M: 3), new(4, 5, M: 6)] };
+        var json = GeoJsonBuilder.Geometry(line)!;
+
+        var coords = json["coordinates"]!.AsArray();
+        coords.Should().HaveCount(2);
+        coords[0]!.AsArray().Should().HaveCount(3);
+        coords[0]![2]!.GetValue<long>().Should().Be(3);
     }
 
     // ---- Negative coordinates ----

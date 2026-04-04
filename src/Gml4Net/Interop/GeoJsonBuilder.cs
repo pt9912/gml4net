@@ -182,15 +182,15 @@ public static class GeoJsonBuilder
     private static JsonObject BuildBox(GmlBox box) =>
         BuildBboxPolygon(box.LowerCorner, box.UpperCorner);
 
-    /// <summary>Builds a GeoJSON Polygon rectangle from lower/upper corner, preserving Z.</summary>
+    /// <summary>Builds a GeoJSON Polygon rectangle from lower/upper corner, preserving available ordinates.</summary>
     private static JsonObject BuildBboxPolygon(GmlCoordinate ll, GmlCoordinate ur)
     {
         var ring = new JsonArray
         {
             CoordToArray(ll),
-            CoordToArray(new GmlCoordinate(ur.X, ll.Y, ll.Z)),
+            CoordToArray(new GmlCoordinate(ur.X, ll.Y, ll.Z, ll.M)),
             CoordToArray(ur),
-            CoordToArray(new GmlCoordinate(ll.X, ur.Y, ur.Z)),
+            CoordToArray(new GmlCoordinate(ll.X, ur.Y, ur.Z, ur.M)),
             CoordToArray(ll)
         };
 
@@ -262,17 +262,14 @@ public static class GeoJsonBuilder
 
     // ---- Coordinate helpers ----
 
-    /// <summary>Converts a single coordinate to a JSON array [x, y], [x, y, z], or [x, y, z, m].</summary>
+    /// <summary>Converts a single coordinate to a JSON array [x, y], [x, y, z], [x, y, m], or [x, y, z, m].</summary>
     private static JsonArray CoordToArray(GmlCoordinate c)
     {
         var arr = new JsonArray { Num(c.X), Num(c.Y) };
         if (c.Z.HasValue)
             arr.Add(Num(c.Z.Value));
         if (c.M.HasValue)
-        {
-            if (!c.Z.HasValue) arr.Add(Num(0)); // pad Z=0 before M per RFC 7946
             arr.Add(Num(c.M.Value));
-        }
         return arr;
     }
 
