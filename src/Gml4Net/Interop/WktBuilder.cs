@@ -1,14 +1,67 @@
 using System.Globalization;
 using Gml4Net.Model;
+using Gml4Net.Model.Coverage;
+using Gml4Net.Model.Feature;
 using Gml4Net.Model.Geometry;
 
 namespace Gml4Net.Interop;
 
 /// <summary>
 /// Converts GML geometry objects to Well-Known Text (WKT) strings.
+/// Implements <see cref="IGmlBuilder{TGeometry,TFeature,TCollection}"/> and also
+/// provides static convenience methods via <see cref="Instance"/>.
 /// </summary>
-public static class WktBuilder
+public sealed class WktBuilder : IGmlBuilder<string, string, string>
 {
+    /// <summary>Shared default instance.</summary>
+    public static WktBuilder Instance { get; } = new();
+
+    // ---- IGmlBuilder implementation ----
+
+    /// <inheritdoc />
+    public string? BuildPoint(GmlPoint point) => BuildPointCore(point);
+    /// <inheritdoc />
+    public string? BuildLineString(GmlLineString lineString) => BuildLineStringCore(lineString);
+    /// <inheritdoc />
+    public string? BuildLinearRing(GmlLinearRing linearRing) => BuildLinearRingCore(linearRing);
+    /// <inheritdoc />
+    public string? BuildPolygon(GmlPolygon polygon) => BuildPolygonCore(polygon);
+    /// <inheritdoc />
+    public string? BuildMultiPoint(GmlMultiPoint multiPoint) => BuildMultiPointCore(multiPoint);
+    /// <inheritdoc />
+    public string? BuildMultiLineString(GmlMultiLineString multiLineString) => BuildMultiLineStringCore(multiLineString);
+    /// <inheritdoc />
+    public string? BuildMultiPolygon(GmlMultiPolygon multiPolygon) => BuildMultiPolygonCore(multiPolygon);
+    /// <inheritdoc />
+    public string? BuildEnvelope(GmlEnvelope envelope) => BuildBboxWkt(envelope.LowerCorner, envelope.UpperCorner);
+    /// <inheritdoc />
+    public string? BuildBox(GmlBox box) => BuildBboxWkt(box.LowerCorner, box.UpperCorner);
+    /// <inheritdoc />
+    public string? BuildCurve(GmlCurve curve) => BuildCurveCore(curve);
+    /// <inheritdoc />
+    public string? BuildSurface(GmlSurface surface) => BuildSurfaceCore(surface);
+
+    /// <inheritdoc />
+    public string BuildFeature(GmlFeature feature)
+    {
+        ArgumentNullException.ThrowIfNull(feature);
+        var geomEntry = feature.Properties.Entries.FirstOrDefault(e => e.Value is GmlGeometryProperty);
+        if (geomEntry is null) return string.Empty;
+        return Geometry(((GmlGeometryProperty)geomEntry.Value).Geometry) ?? string.Empty;
+    }
+
+    /// <inheritdoc />
+    public string BuildFeatureCollection(GmlFeatureCollection fc)
+    {
+        ArgumentNullException.ThrowIfNull(fc);
+        return string.Join("\n", fc.Features.Select(f => BuildFeature(f)));
+    }
+
+    /// <inheritdoc />
+    public object? BuildCoverage(GmlCoverage coverage) => null;
+
+    // ---- Static convenience API (backward compatible) ----
+
     /// <summary>
     /// Converts a <see cref="GmlGeometry"/> to a WKT string.
     /// </summary>
@@ -20,33 +73,26 @@ public static class WktBuilder
 
         return geometry switch
         {
-            GmlPoint p => BuildPoint(p),
-            GmlLineString ls => BuildLineString(ls),
-            GmlLinearRing lr => BuildLinearRing(lr),
-            GmlPolygon poly => BuildPolygon(poly),
+            GmlPoint p => BuildPointCore(p),
+            GmlLineString ls => BuildLineStringCore(ls),
+            GmlLinearRing lr => BuildLinearRingCore(lr),
+            GmlPolygon poly => BuildPolygonCore(poly),
             GmlEnvelope env => BuildBboxWkt(env.LowerCorner, env.UpperCorner),
             GmlBox box => BuildBboxWkt(box.LowerCorner, box.UpperCorner),
-            GmlCurve c => BuildCurve(c),
-            GmlSurface s => BuildSurface(s),
-            GmlMultiPoint mp => BuildMultiPoint(mp),
-            GmlMultiLineString mls => BuildMultiLineString(mls),
-            GmlMultiPolygon mpoly => BuildMultiPolygon(mpoly),
+            GmlCurve c => BuildCurveCore(c),
+            GmlSurface s => BuildSurfaceCore(s),
+            GmlMultiPoint mp => BuildMultiPointCore(mp),
+            GmlMultiLineString mls => BuildMultiLineStringCore(mls),
+            GmlMultiPolygon mpoly => BuildMultiPolygonCore(mpoly),
             _ => null
         };
     }
 
-    private enum CoordinateLayout
-    {
-        Xy,
-        Xyz,
-        Xym,
-        Xyzm
-    }
+    // ---- Private core builders ----
 
-    // ---- Builders ----
+    private enum CoordinateLayout { Xy, Xyz, Xym, Xyzm }
 
-    /// <summary>Builds POINT, POINT Z, POINT M, or POINT ZM.</summary>
-    private static string BuildPoint(GmlPoint p)
+    private static string BuildPointCore(GmlPoint p)
     {
         var c = p.Coordinate;
         var layout = GetLayout(c);
@@ -54,78 +100,57 @@ public static class WktBuilder
         return $"{tag} ({FormatCoord(c, layout)})";
     }
 
-    /// <summary>Builds LINESTRING or LINESTRING EMPTY.</summary>
-    private static string BuildLineString(GmlLineString ls) =>
+    private static string BuildLineStringCore(GmlLineString ls) =>
         ls.Coordinates.Count == 0 ? "LINESTRING EMPTY" : WrapCoords("LINESTRING", ls.Coordinates);
 
-    /// <summary>Builds LINESTRING from LinearRing.</summary>
-    private static string BuildLinearRing(GmlLinearRing lr) =>
+    private static string BuildLinearRingCore(GmlLinearRing lr) =>
         lr.Coordinates.Count == 0 ? "LINESTRING EMPTY" : WrapCoords("LINESTRING", lr.Coordinates);
 
-    /// <summary>Builds POLYGON with exterior and interior rings.</summary>
-    private static string BuildPolygon(GmlPolygon poly)
+    private static string BuildPolygonCore(GmlPolygon poly)
     {
         var allCoords = new List<IReadOnlyList<GmlCoordinate>> { poly.Exterior.Coordinates };
         allCoords.AddRange(poly.Interior.Select(h => h.Coordinates));
-
         var layout = GetLayout(allCoords.SelectMany(r => r));
-        var rings = allCoords.Select(r =>
-            $"({FormatCoords(r, layout)})");
-
-        var tag = GetTypeTag("POLYGON", layout);
-        return $"{tag} ({string.Join(", ", rings)})";
+        var rings = allCoords.Select(r => $"({FormatCoords(r, layout)})");
+        return $"{GetTypeTag("POLYGON", layout)} ({string.Join(", ", rings)})";
     }
 
-    /// <summary>Builds POLYGON rectangle from lower/upper corner, preserving available ordinates.</summary>
     private static string BuildBboxWkt(GmlCoordinate ll, GmlCoordinate ur)
     {
         var coords = new[]
         {
-            ll,
-            new GmlCoordinate(ur.X, ll.Y, ll.Z, ll.M),
-            ur,
-            new GmlCoordinate(ll.X, ur.Y, ur.Z, ur.M),
-            ll
+            ll, new GmlCoordinate(ur.X, ll.Y, ll.Z, ll.M),
+            ur, new GmlCoordinate(ll.X, ur.Y, ur.Z, ur.M), ll
         };
         var layout = GetLayout(coords);
-        var tag = GetTypeTag("POLYGON", layout);
-        return $"{tag} (({FormatCoords(coords, layout)}))";
+        return $"{GetTypeTag("POLYGON", layout)} (({FormatCoords(coords, layout)}))";
     }
 
-    /// <summary>Builds LINESTRING from Curve (flattened segments).</summary>
-    private static string BuildCurve(GmlCurve c) =>
+    private static string BuildCurveCore(GmlCurve c) =>
         c.Coordinates.Count == 0 ? "LINESTRING EMPTY" : WrapCoords("LINESTRING", c.Coordinates);
 
-    /// <summary>Builds MULTIPOLYGON from Surface (polygon patches).</summary>
-    private static string BuildSurface(GmlSurface s)
+    private static string BuildSurfaceCore(GmlSurface s)
     {
         var layout = GetLayout(s.Patches.SelectMany(GetPolygonCoordinates));
         var polys = s.Patches.Select(patch => FormatPolygonRings(patch, layout));
         return $"{GetTypeTag("MULTIPOLYGON", layout)} ({string.Join(", ", polys)})";
     }
 
-    /// <summary>Builds MULTIPOINT.</summary>
-    private static string BuildMultiPoint(GmlMultiPoint mp)
+    private static string BuildMultiPointCore(GmlMultiPoint mp)
     {
         var layout = GetLayout(mp.Points.Select(p => p.Coordinate));
-        var points = mp.Points.Select(p =>
-            $"({FormatCoord(p.Coordinate, layout)})");
-        var tag = GetTypeTag("MULTIPOINT", layout);
-        return $"{tag} ({string.Join(", ", points)})";
+        var points = mp.Points.Select(p => $"({FormatCoord(p.Coordinate, layout)})");
+        return $"{GetTypeTag("MULTIPOINT", layout)} ({string.Join(", ", points)})";
     }
 
-    /// <summary>Builds MULTILINESTRING.</summary>
-    private static string BuildMultiLineString(GmlMultiLineString mls)
+    private static string BuildMultiLineStringCore(GmlMultiLineString mls)
     {
         var layout = GetLayout(mls.LineStrings.SelectMany(ls => ls.Coordinates));
-        var lines = mls.LineStrings.Select(ls =>
-            $"({FormatCoords(ls.Coordinates, layout)})");
-        var tag = GetTypeTag("MULTILINESTRING", layout);
-        return $"{tag} ({string.Join(", ", lines)})";
+        var lines = mls.LineStrings.Select(ls => $"({FormatCoords(ls.Coordinates, layout)})");
+        return $"{GetTypeTag("MULTILINESTRING", layout)} ({string.Join(", ", lines)})";
     }
 
-    /// <summary>Builds MULTIPOLYGON.</summary>
-    private static string BuildMultiPolygon(GmlMultiPolygon mpoly)
+    private static string BuildMultiPolygonCore(GmlMultiPolygon mpoly)
     {
         var layout = GetLayout(mpoly.Polygons.SelectMany(GetPolygonCoordinates));
         var polys = mpoly.Polygons.Select(poly => FormatPolygonRings(poly, layout));
@@ -134,28 +159,20 @@ public static class WktBuilder
 
     // ---- Shared helpers ----
 
-    /// <summary>Formats a polygon's exterior + interior rings as WKT ring list.</summary>
     private static string FormatPolygonRings(GmlPolygon poly, CoordinateLayout layout)
     {
         var allCoords = new List<IReadOnlyList<GmlCoordinate>> { poly.Exterior.Coordinates };
         allCoords.AddRange(poly.Interior.Select(h => h.Coordinates));
-
-        var rings = allCoords.Select(r =>
-            $"({FormatCoords(r, layout)})");
+        var rings = allCoords.Select(r => $"({FormatCoords(r, layout)})");
         return $"({string.Join(", ", rings)})";
     }
 
-    /// <summary>Wraps coordinates with a WKT type tag, auto-detecting XY/XYZ/XYM/XYZM layout.</summary>
     private static string WrapCoords(string typeName, IReadOnlyList<GmlCoordinate> coords)
     {
         var layout = GetLayout(coords);
-        var tag = GetTypeTag(typeName, layout);
-        return $"{tag} ({FormatCoords(coords, layout)})";
+        return $"{GetTypeTag(typeName, layout)} ({FormatCoords(coords, layout)})";
     }
 
-    // ---- Formatting helpers ----
-
-    /// <summary>Formats a coordinate according to the requested XY/XYZ/XYM/XYZM layout.</summary>
     private static string FormatCoord(GmlCoordinate c, CoordinateLayout layout) => layout switch
     {
         CoordinateLayout.Xy => $"{F(c.X)} {F(c.Y)}",
@@ -165,36 +182,25 @@ public static class WktBuilder
         _ => throw new ArgumentOutOfRangeException(nameof(layout))
     };
 
-    /// <summary>Formats a list of coordinates using the requested XY/XYZ/XYM/XYZM layout.</summary>
     private static string FormatCoords(IEnumerable<GmlCoordinate> coords, CoordinateLayout layout) =>
         string.Join(", ", coords.Select(c => FormatCoord(c, layout)));
 
-    /// <summary>Determines the output layout for a coordinate sequence.</summary>
     private static CoordinateLayout GetLayout(IEnumerable<GmlCoordinate> coords)
     {
-        var hasZ = false;
-        var hasM = false;
-
+        bool hasZ = false, hasM = false;
         foreach (var coord in coords)
         {
             hasZ |= coord.Z.HasValue;
             hasM |= coord.M.HasValue;
-            if (hasZ && hasM)
-                return CoordinateLayout.Xyzm;
+            if (hasZ && hasM) return CoordinateLayout.Xyzm;
         }
-
-        if (hasM)
-            return CoordinateLayout.Xym;
-        if (hasZ)
-            return CoordinateLayout.Xyz;
+        if (hasM) return CoordinateLayout.Xym;
+        if (hasZ) return CoordinateLayout.Xyz;
         return CoordinateLayout.Xy;
     }
 
-    /// <summary>Determines the output layout for a single coordinate.</summary>
-    private static CoordinateLayout GetLayout(GmlCoordinate coord) =>
-        GetLayout([coord]);
+    private static CoordinateLayout GetLayout(GmlCoordinate coord) => GetLayout([coord]);
 
-    /// <summary>Formats a geometry type tag with the required dimension suffix.</summary>
     private static string GetTypeTag(string typeName, CoordinateLayout layout) => layout switch
     {
         CoordinateLayout.Xy => typeName,
@@ -204,20 +210,12 @@ public static class WktBuilder
         _ => throw new ArgumentOutOfRangeException(nameof(layout))
     };
 
-    /// <summary>Enumerates all coordinates of a polygon, including holes.</summary>
     private static IEnumerable<GmlCoordinate> GetPolygonCoordinates(GmlPolygon polygon)
     {
-        foreach (var coord in polygon.Exterior.Coordinates)
-            yield return coord;
-
+        foreach (var coord in polygon.Exterior.Coordinates) yield return coord;
         foreach (var ring in polygon.Interior)
-        {
-            foreach (var coord in ring.Coordinates)
-                yield return coord;
-        }
+            foreach (var coord in ring.Coordinates) yield return coord;
     }
 
-    /// <summary>Formats a double using invariant culture.</summary>
-    private static string F(double d) =>
-        d.ToString(CultureInfo.InvariantCulture);
+    private static string F(double d) => d.ToString(CultureInfo.InvariantCulture);
 }

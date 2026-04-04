@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Gml4Net.Model;
+using Gml4Net.Model.Coverage;
 using Gml4Net.Model.Feature;
 using Gml4Net.Model.Geometry;
 
@@ -7,9 +8,47 @@ namespace Gml4Net.Interop;
 
 /// <summary>
 /// Converts GML model objects to GeoJSON using <see cref="System.Text.Json.Nodes"/>.
+/// Implements <see cref="IGmlBuilder{TGeometry,TFeature,TCollection}"/> and also
+/// provides static convenience methods via <see cref="Instance"/>.
 /// </summary>
-public static class GeoJsonBuilder
+public sealed class GeoJsonBuilder : IGmlBuilder<JsonObject, JsonObject, JsonObject>
 {
+    /// <summary>Shared default instance.</summary>
+    public static GeoJsonBuilder Instance { get; } = new();
+
+    // ---- IGmlBuilder implementation ----
+
+    /// <inheritdoc />
+    public JsonObject? BuildPoint(GmlPoint point) => BuildPointCore(point);
+    /// <inheritdoc />
+    public JsonObject? BuildLineString(GmlLineString lineString) => BuildLineStringCore(lineString);
+    /// <inheritdoc />
+    public JsonObject? BuildLinearRing(GmlLinearRing linearRing) => BuildLinearRingCore(linearRing);
+    /// <inheritdoc />
+    public JsonObject? BuildPolygon(GmlPolygon polygon) => BuildPolygonCore(polygon);
+    /// <inheritdoc />
+    public JsonObject? BuildMultiPoint(GmlMultiPoint multiPoint) => BuildMultiPointCore(multiPoint);
+    /// <inheritdoc />
+    public JsonObject? BuildMultiLineString(GmlMultiLineString multiLineString) => BuildMultiLineStringCore(multiLineString);
+    /// <inheritdoc />
+    public JsonObject? BuildMultiPolygon(GmlMultiPolygon multiPolygon) => BuildMultiPolygonCore(multiPolygon);
+    /// <inheritdoc />
+    public JsonObject? BuildEnvelope(GmlEnvelope envelope) => BuildBboxPolygon(envelope.LowerCorner, envelope.UpperCorner);
+    /// <inheritdoc />
+    public JsonObject? BuildBox(GmlBox box) => BuildBboxPolygon(box.LowerCorner, box.UpperCorner);
+    /// <inheritdoc />
+    public JsonObject? BuildCurve(GmlCurve curve) => BuildCurveCore(curve);
+    /// <inheritdoc />
+    public JsonObject? BuildSurface(GmlSurface surface) => BuildSurfaceCore(surface);
+    /// <inheritdoc />
+    public JsonObject BuildFeature(GmlFeature feature) => Feature(feature);
+    /// <inheritdoc />
+    public JsonObject BuildFeatureCollection(GmlFeatureCollection fc) => FeatureCollection(fc);
+    /// <inheritdoc />
+    public object? BuildCoverage(GmlCoverage coverage) => null;
+
+    // ---- Static convenience API (backward compatible) ----
+
     /// <summary>
     /// Converts a <see cref="GmlGeometry"/> to a GeoJSON geometry <see cref="JsonObject"/>.
     /// </summary>
@@ -21,17 +60,17 @@ public static class GeoJsonBuilder
 
         return geometry switch
         {
-            GmlPoint p => BuildPoint(p),
-            GmlLineString ls => BuildLineString(ls),
-            GmlLinearRing lr => BuildLinearRing(lr),
-            GmlPolygon poly => BuildPolygon(poly),
-            GmlEnvelope env => BuildEnvelope(env),
-            GmlBox box => BuildBox(box),
-            GmlCurve c => BuildCurve(c),
-            GmlSurface s => BuildSurface(s),
-            GmlMultiPoint mp => BuildMultiPoint(mp),
-            GmlMultiLineString mls => BuildMultiLineString(mls),
-            GmlMultiPolygon mpoly => BuildMultiPolygon(mpoly),
+            GmlPoint p => BuildPointCore(p),
+            GmlLineString ls => BuildLineStringCore(ls),
+            GmlLinearRing lr => BuildLinearRingCore(lr),
+            GmlPolygon poly => BuildPolygonCore(poly),
+            GmlEnvelope env => BuildBboxPolygon(env.LowerCorner, env.UpperCorner),
+            GmlBox box => BuildBboxPolygon(box.LowerCorner, box.UpperCorner),
+            GmlCurve c => BuildCurveCore(c),
+            GmlSurface s => BuildSurfaceCore(s),
+            GmlMultiPoint mp => BuildMultiPointCore(mp),
+            GmlMultiLineString mls => BuildMultiLineStringCore(mls),
+            GmlMultiPolygon mpoly => BuildMultiPolygonCore(mpoly),
             _ => null
         };
     }
@@ -84,9 +123,7 @@ public static class GeoJsonBuilder
 
         var features = new JsonArray();
         foreach (var f in fc.Features)
-        {
             features.Add(Feature(f));
-        }
 
         return new JsonObject
         {
@@ -113,76 +150,52 @@ public static class GeoJsonBuilder
         };
     }
 
-    /// <summary>
-    /// Converts a <see cref="GmlGeometry"/> to a GeoJSON JSON string.
-    /// </summary>
+    /// <summary>Converts a geometry to a GeoJSON JSON string.</summary>
     /// <param name="geometry">The GML geometry to convert.</param>
     /// <returns>A GeoJSON geometry JSON string, or null if not supported.</returns>
     public static string? GeometryToJson(GmlGeometry geometry) =>
         Geometry(geometry)?.ToJsonString();
 
-    /// <summary>
-    /// Converts a <see cref="GmlFeature"/> to a GeoJSON Feature JSON string.
-    /// </summary>
+    /// <summary>Converts a feature to a GeoJSON Feature JSON string.</summary>
     /// <param name="feature">The GML feature to convert.</param>
     /// <returns>A GeoJSON Feature JSON string.</returns>
     public static string FeatureToJson(GmlFeature feature) =>
         Feature(feature).ToJsonString();
 
-    /// <summary>
-    /// Converts a <see cref="GmlFeatureCollection"/> to a GeoJSON FeatureCollection JSON string.
-    /// </summary>
+    /// <summary>Converts a feature collection to a GeoJSON FeatureCollection JSON string.</summary>
     /// <param name="fc">The GML feature collection to convert.</param>
     /// <returns>A GeoJSON FeatureCollection JSON string.</returns>
     public static string FeatureCollectionToJson(GmlFeatureCollection fc) =>
         FeatureCollection(fc).ToJsonString();
 
-    // ---- Private builders ----
+    // ---- Private core builders ----
 
-    /// <summary>Builds a GeoJSON Point from a GML Point.</summary>
-    private static JsonObject BuildPoint(GmlPoint p) => new()
+    private static JsonObject BuildPointCore(GmlPoint p) => new()
     {
         ["type"] = "Point",
         ["coordinates"] = CoordToArray(p.Coordinate)
     };
 
-    /// <summary>Builds a GeoJSON LineString from a GML LineString.</summary>
-    private static JsonObject BuildLineString(GmlLineString ls) => new()
+    private static JsonObject BuildLineStringCore(GmlLineString ls) => new()
     {
         ["type"] = "LineString",
         ["coordinates"] = CoordsToArray(ls.Coordinates)
     };
 
-    /// <summary>Builds a GeoJSON LineString from a GML LinearRing (same structure).</summary>
-    private static JsonObject BuildLinearRing(GmlLinearRing lr) => new()
+    private static JsonObject BuildLinearRingCore(GmlLinearRing lr) => new()
     {
         ["type"] = "LineString",
         ["coordinates"] = CoordsToArray(lr.Coordinates)
     };
 
-    /// <summary>Builds a GeoJSON Polygon from a GML Polygon.</summary>
-    private static JsonObject BuildPolygon(GmlPolygon poly)
+    private static JsonObject BuildPolygonCore(GmlPolygon poly)
     {
         var rings = new JsonArray { CoordsToArray(poly.Exterior.Coordinates) };
         foreach (var hole in poly.Interior)
             rings.Add(CoordsToArray(hole.Coordinates));
-
-        return new JsonObject
-        {
-            ["type"] = "Polygon",
-            ["coordinates"] = rings
-        };
+        return new JsonObject { ["type"] = "Polygon", ["coordinates"] = rings };
     }
 
-    /// <summary>Builds a GeoJSON Polygon rectangle from a GML Envelope.</summary>
-    private static JsonObject BuildEnvelope(GmlEnvelope env) =>
-        BuildBboxPolygon(env.LowerCorner, env.UpperCorner);
-
-    /// <summary>Builds a GeoJSON Polygon rectangle from a GML 2 Box.</summary>
-    private static JsonObject BuildBox(GmlBox box) =>
-        BuildBboxPolygon(box.LowerCorner, box.UpperCorner);
-
-    /// <summary>Builds a GeoJSON Polygon rectangle from lower/upper corner, preserving available ordinates.</summary>
     private static JsonObject BuildBboxPolygon(GmlCoordinate ll, GmlCoordinate ur)
     {
         var ring = new JsonArray
@@ -193,23 +206,16 @@ public static class GeoJsonBuilder
             CoordToArray(new GmlCoordinate(ll.X, ur.Y, ur.Z, ur.M)),
             CoordToArray(ll)
         };
-
-        return new JsonObject
-        {
-            ["type"] = "Polygon",
-            ["coordinates"] = new JsonArray { ring }
-        };
+        return new JsonObject { ["type"] = "Polygon", ["coordinates"] = new JsonArray { ring } };
     }
 
-    /// <summary>Builds a GeoJSON LineString from a GML Curve (flattened).</summary>
-    private static JsonObject BuildCurve(GmlCurve c) => new()
+    private static JsonObject BuildCurveCore(GmlCurve c) => new()
     {
         ["type"] = "LineString",
         ["coordinates"] = CoordsToArray(c.Coordinates)
     };
 
-    /// <summary>Builds a GeoJSON MultiPolygon from a GML Surface (polygon patches).</summary>
-    private static JsonObject BuildSurface(GmlSurface s)
+    private static JsonObject BuildSurfaceCore(GmlSurface s)
     {
         var polygons = new JsonArray();
         foreach (var patch in s.Patches)
@@ -219,30 +225,22 @@ public static class GeoJsonBuilder
                 rings.Add(CoordsToArray(hole.Coordinates));
             polygons.Add(rings);
         }
-
-        return new JsonObject
-        {
-            ["type"] = "MultiPolygon",
-            ["coordinates"] = polygons
-        };
+        return new JsonObject { ["type"] = "MultiPolygon", ["coordinates"] = polygons };
     }
 
-    /// <summary>Builds a GeoJSON MultiPoint from a GML MultiPoint.</summary>
-    private static JsonObject BuildMultiPoint(GmlMultiPoint mp) => new()
+    private static JsonObject BuildMultiPointCore(GmlMultiPoint mp) => new()
     {
         ["type"] = "MultiPoint",
         ["coordinates"] = new JsonArray(mp.Points.Select(p => CoordToArray(p.Coordinate)).ToArray<JsonNode>())
     };
 
-    /// <summary>Builds a GeoJSON MultiLineString from a GML MultiLineString.</summary>
-    private static JsonObject BuildMultiLineString(GmlMultiLineString mls) => new()
+    private static JsonObject BuildMultiLineStringCore(GmlMultiLineString mls) => new()
     {
         ["type"] = "MultiLineString",
         ["coordinates"] = new JsonArray(mls.LineStrings.Select(ls => CoordsToArray(ls.Coordinates)).ToArray<JsonNode>())
     };
 
-    /// <summary>Builds a GeoJSON MultiPolygon from a GML MultiPolygon.</summary>
-    private static JsonObject BuildMultiPolygon(GmlMultiPolygon mpoly)
+    private static JsonObject BuildMultiPolygonCore(GmlMultiPolygon mpoly)
     {
         var polygons = new JsonArray();
         foreach (var poly in mpoly.Polygons)
@@ -252,32 +250,22 @@ public static class GeoJsonBuilder
                 rings.Add(CoordsToArray(hole.Coordinates));
             polygons.Add(rings);
         }
-
-        return new JsonObject
-        {
-            ["type"] = "MultiPolygon",
-            ["coordinates"] = polygons
-        };
+        return new JsonObject { ["type"] = "MultiPolygon", ["coordinates"] = polygons };
     }
 
     // ---- Coordinate helpers ----
 
-    /// <summary>Converts a single coordinate to a JSON array [x, y], [x, y, z], [x, y, m], or [x, y, z, m].</summary>
     private static JsonArray CoordToArray(GmlCoordinate c)
     {
         var arr = new JsonArray { Num(c.X), Num(c.Y) };
-        if (c.Z.HasValue)
-            arr.Add(Num(c.Z.Value));
-        if (c.M.HasValue)
-            arr.Add(Num(c.M.Value));
+        if (c.Z.HasValue) arr.Add(Num(c.Z.Value));
+        if (c.M.HasValue) arr.Add(Num(c.M.Value));
         return arr;
     }
 
-    /// <summary>Converts a list of coordinates to a JSON array of arrays.</summary>
     private static JsonArray CoordsToArray(IReadOnlyList<GmlCoordinate> coords) =>
         new(coords.Select(c => CoordToArray(c)).ToArray<JsonNode>());
 
-    /// <summary>Creates a JsonValue from a double, using integer representation when possible.</summary>
     private static JsonValue Num(double d) =>
         d == Math.Truncate(d) && d >= long.MinValue && d <= long.MaxValue && !double.IsInfinity(d)
             ? JsonValue.Create((long)d)
@@ -285,7 +273,6 @@ public static class GeoJsonBuilder
 
     // ---- Property conversion ----
 
-    /// <summary>Converts a GML property value to its JSON equivalent.</summary>
     private static JsonNode? ConvertPropertyValue(GmlPropertyValue value) => value switch
     {
         GmlStringProperty s => JsonValue.Create(s.Value),
@@ -296,14 +283,11 @@ public static class GeoJsonBuilder
         _ => null
     };
 
-    /// <summary>Converts a nested GML property to a JSON object.</summary>
     private static JsonObject ConvertNestedProperty(GmlNestedProperty nested)
     {
         var obj = new JsonObject();
         foreach (var entry in nested.Children.Entries)
-        {
             AppendPropertyValue(obj, entry.Name, ConvertPropertyValue(entry.Value));
-        }
         return obj;
     }
 
@@ -314,13 +298,11 @@ public static class GeoJsonBuilder
             obj[name] = value;
             return;
         }
-
         if (existing is JsonArray array)
         {
             array.Add(value);
             return;
         }
-
         obj[name] = new JsonArray(existing?.DeepClone(), value);
     }
 }
