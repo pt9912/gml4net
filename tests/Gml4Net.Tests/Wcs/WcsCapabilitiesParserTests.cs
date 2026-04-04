@@ -124,4 +124,96 @@ public class WcsCapabilitiesParserTests
 
         caps.Crs.Should().Equal("EPSG:4326", "EPSG:3857");
     }
+
+    [Fact]
+    public void Parse_Wcs20CapabilitiesWithOws20_ParsesOperationsAndBbox()
+    {
+        var xml = """
+            <wcs:Capabilities xmlns:wcs="http://www.opengis.net/wcs/2.0"
+                              xmlns:ows="http://www.opengis.net/ows/2.0"
+                              xmlns:xlink="http://www.w3.org/1999/xlink"
+                              version="2.0.1">
+                <ows:ServiceIdentification>
+                    <ows:Title>OWS 2 Service</ows:Title>
+                </ows:ServiceIdentification>
+                <ows:OperationsMetadata>
+                    <ows:Operation name="GetCoverage">
+                        <ows:DCP>
+                            <ows:HTTP>
+                                <ows:Get xlink:href="https://example.com/ows2?"/>
+                            </ows:HTTP>
+                        </ows:DCP>
+                    </ows:Operation>
+                </ows:OperationsMetadata>
+                <wcs:Contents>
+                    <wcs:CoverageSummary>
+                        <wcs:CoverageId>dem</wcs:CoverageId>
+                        <ows:WGS84BoundingBox>
+                            <ows:LowerCorner>1 2</ows:LowerCorner>
+                            <ows:UpperCorner>3 4</ows:UpperCorner>
+                        </ows:WGS84BoundingBox>
+                    </wcs:CoverageSummary>
+                </wcs:Contents>
+            </wcs:Capabilities>
+            """;
+
+        var caps = WcsCapabilitiesParser.Parse(xml);
+
+        caps.ServiceIdentification!.Title.Should().Be("OWS 2 Service");
+        caps.Operations.Should().ContainSingle();
+        caps.Operations[0].GetUrl.Should().Be("https://example.com/ows2?");
+        caps.Coverages.Should().ContainSingle();
+        caps.Coverages[0].Bbox.Should().Equal(1, 2, 3, 4);
+    }
+
+    [Fact]
+    public void Parse_Wcs100Capabilities_ParsesLegacySections()
+    {
+        var xml = """
+            <wcs:WCS_Capabilities xmlns:wcs="http://www.opengis.net/wcs"
+                                  xmlns:gml="http://www.opengis.net/gml"
+                                  version="1.0.0">
+                <wcs:Service>
+                    <wcs:name>WCS</wcs:name>
+                    <wcs:label>Legacy WCS</wcs:label>
+                    <wcs:description>Legacy service description</wcs:description>
+                </wcs:Service>
+                <wcs:Capability>
+                    <wcs:Request>
+                        <wcs:GetCoverage>
+                            <wcs:DCPType>
+                                <wcs:HTTP>
+                                    <wcs:Get onlineResource="https://example.com/wcs?"/>
+                                </wcs:HTTP>
+                            </wcs:DCPType>
+                            <wcs:Format>GeoTIFF</wcs:Format>
+                            <wcs:Format>image/tiff</wcs:Format>
+                        </wcs:GetCoverage>
+                    </wcs:Request>
+                </wcs:Capability>
+                <wcs:ContentMetadata>
+                    <wcs:CoverageOfferingBrief>
+                        <wcs:name>dem_legacy</wcs:name>
+                        <gml:lonLatEnvelope>
+                            <gml:pos>5 47</gml:pos>
+                            <gml:pos>15 55</gml:pos>
+                        </gml:lonLatEnvelope>
+                    </wcs:CoverageOfferingBrief>
+                </wcs:ContentMetadata>
+            </wcs:WCS_Capabilities>
+            """;
+
+        var caps = WcsCapabilitiesParser.Parse(xml);
+
+        caps.Version.Should().Be("1.0.0");
+        caps.ServiceIdentification!.Title.Should().Be("Legacy WCS");
+        caps.ServiceIdentification.Abstract.Should().Be("Legacy service description");
+        caps.Operations.Should().ContainSingle();
+        caps.Operations[0].Name.Should().Be("GetCoverage");
+        caps.Operations[0].GetUrl.Should().Be("https://example.com/wcs?");
+        caps.Formats.Should().Equal("GeoTIFF", "image/tiff");
+        caps.Coverages.Should().ContainSingle();
+        caps.Coverages[0].CoverageId.Should().Be("dem_legacy");
+        caps.Coverages[0].Bbox.Should().Equal(5, 47, 15, 55);
+    }
 }

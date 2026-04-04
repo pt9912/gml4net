@@ -95,6 +95,16 @@ public sealed class WcsRequestBuilder
     {
         ArgumentNullException.ThrowIfNull(options);
 
+        if (!SupportsAdvancedKvpOptions(_version)
+            && (options.Subsets.Count > 0
+                || options.OutputCrs is not null
+                || options.RangeSubset is { Count: > 0 }
+                || options.Interpolation is not null))
+        {
+            throw new NotSupportedException(
+                $"Advanced GetCoverage KVP options are only supported for WCS 2.0+ by this builder. Version: {FormatVersion(_version)}");
+        }
+
         var parts = new List<string>
         {
             "service=WCS",
@@ -141,6 +151,18 @@ public sealed class WcsRequestBuilder
     {
         ArgumentNullException.ThrowIfNull(options);
 
+        if (!IsWcs20Plus(_version))
+        {
+            throw new NotSupportedException(
+                $"POST XML GetCoverage requests are only supported for WCS 2.0+. Version: {FormatVersion(_version)}");
+        }
+
+        if (options.OutputCrs is not null || options.RangeSubset is { Count: > 0 } || options.Interpolation is not null)
+        {
+            throw new NotSupportedException(
+                "OutputCrs, RangeSubset and Interpolation are not yet supported for WCS POST XML requests.");
+        }
+
         XNamespace wcs = GmlNamespaces.Wcs;
         var root = new XElement(wcs + "GetCoverage",
             new XAttribute(XNamespace.Xmlns + "wcs", wcs.NamespaceName),
@@ -150,15 +172,18 @@ public sealed class WcsRequestBuilder
 
         foreach (var subset in options.Subsets)
         {
-            var dimEl = new XElement(wcs + "DimensionTrim",
-                new XElement(wcs + "Dimension", subset.Axis));
+            XElement dimEl;
 
             if (subset.Value is not null)
             {
+                dimEl = new XElement(wcs + "DimensionSlice",
+                    new XElement(wcs + "Dimension", subset.Axis));
                 dimEl.Add(new XElement(wcs + "SlicePoint", subset.Value));
             }
             else
             {
+                dimEl = new XElement(wcs + "DimensionTrim",
+                    new XElement(wcs + "Dimension", subset.Axis));
                 if (subset.Min is not null)
                     dimEl.Add(new XElement(wcs + "TrimLow", subset.Min));
                 if (subset.Max is not null)
@@ -193,4 +218,9 @@ public sealed class WcsRequestBuilder
             return $"{subset.Axis}({subset.Value})";
         return $"{subset.Axis}({subset.Min},{subset.Max})";
     }
+
+    private static bool IsWcs20Plus(WcsVersion version) =>
+        version is WcsVersion.V2_0_0 or WcsVersion.V2_0_1;
+
+    private static bool SupportsAdvancedKvpOptions(WcsVersion version) => IsWcs20Plus(version);
 }

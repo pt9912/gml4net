@@ -39,7 +39,7 @@ public sealed class OwsExceptionReport
 /// </summary>
 public static class OwsExceptionParser
 {
-    private static readonly XNamespace NsOws = GmlNamespaces.Ows;
+    private static readonly string[] OwsNamespaces = [GmlNamespaces.Ows, "http://www.opengis.net/ows/2.0"];
 
     /// <summary>
     /// Returns true if the XML string appears to be an OWS ExceptionReport.
@@ -54,7 +54,7 @@ public static class OwsExceptionParser
         {
             var doc = XDocument.Parse(xml);
             return doc.Root?.Name.LocalName == "ExceptionReport"
-                && doc.Root.Name.NamespaceName == GmlNamespaces.Ows;
+                && OwsNamespaces.Contains(doc.Root.Name.NamespaceName, StringComparer.Ordinal);
         }
         catch
         {
@@ -82,17 +82,18 @@ public static class OwsExceptionParser
         }
 
         var root = doc.Root;
-        if (root is null || root.Name.LocalName != "ExceptionReport" || root.Name.NamespaceName != GmlNamespaces.Ows)
+        if (root is null || root.Name.LocalName != "ExceptionReport"
+            || !OwsNamespaces.Contains(root.Name.NamespaceName, StringComparer.Ordinal))
             return null;
 
         var version = root.Attribute("version")?.Value ?? "unknown";
 
         var exceptions = new List<OwsException>();
-        foreach (var exEl in root.Elements(NsOws + "Exception"))
+        foreach (var exEl in root.Elements().Where(e => e.Name.LocalName == "Exception"))
         {
             var code = exEl.Attribute("exceptionCode")?.Value ?? "unknown";
             var locator = exEl.Attribute("locator")?.Value;
-            var texts = exEl.Elements(NsOws + "ExceptionText")
+            var texts = exEl.Elements().Where(e => e.Name.LocalName == "ExceptionText")
                 .Select(t => t.Value.Trim())
                 .Where(t => !string.IsNullOrEmpty(t))
                 .ToList();

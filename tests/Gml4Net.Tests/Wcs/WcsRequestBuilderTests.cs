@@ -43,6 +43,20 @@ public class WcsRequestBuilderTests
     }
 
     [Fact]
+    public void BuildGetCoverageUrl_V1_1_0_WithSubsets_ThrowsNotSupportedException()
+    {
+        var builder = new WcsRequestBuilder("https://example.com/wcs", WcsVersion.V1_1_0);
+
+        var act = () => builder.BuildGetCoverageUrl(new WcsGetCoverageOptions
+        {
+            CoverageId = "test",
+            Subsets = [new WcsSubset { Axis = "Long", Min = "10", Max = "20" }]
+        });
+
+        act.Should().Throw<NotSupportedException>();
+    }
+
+    [Fact]
     public void BuildGetCoverageUrl_WithSubsets_IncludesSubsetParams()
     {
         var builder = new WcsRequestBuilder("https://example.com/wcs");
@@ -120,10 +134,36 @@ public class WcsRequestBuilderTests
         xml.Should().Contain("GetCoverage");
         xml.Should().Contain("dem_10m");
         xml.Should().Contain("DimensionTrim");
+        xml.Should().Contain("DimensionSlice");
         xml.Should().Contain("Long");
         xml.Should().Contain("TrimLow");
         xml.Should().Contain("TrimHigh");
         xml.Should().Contain("SlicePoint");
         xml.Should().Contain("image/tiff");
+    }
+
+    [Fact]
+    public void BuildGetCoverageXml_WithPointSubset_UsesDimensionSlice()
+    {
+        var builder = new WcsRequestBuilder("https://example.com/wcs", WcsVersion.V2_0_1);
+
+        var xml = builder.BuildGetCoverageXml(new WcsGetCoverageOptions
+        {
+            CoverageId = "dem",
+            Subsets = [new WcsSubset { Axis = "time", Value = "2020-01-01" }]
+        });
+
+        xml.Should().Contain("DimensionSlice");
+        xml.Should().NotContain("DimensionTrim><wcs:Dimension>time");
+    }
+
+    [Fact]
+    public void BuildGetCoverageXml_V1_0_0_ThrowsNotSupportedException()
+    {
+        var builder = new WcsRequestBuilder("https://example.com/wcs", WcsVersion.V1_0_0);
+
+        var act = () => builder.BuildGetCoverageXml(new WcsGetCoverageOptions { CoverageId = "dem" });
+
+        act.Should().Throw<NotSupportedException>();
     }
 }

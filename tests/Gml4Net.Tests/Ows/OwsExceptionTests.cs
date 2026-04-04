@@ -104,4 +104,22 @@ public class OwsExceptionTests
         report!.Exceptions[0].ExceptionTexts.Should().BeEmpty();
         report.Exceptions[0].Locator.Should().BeNull();
     }
+
+    [Fact]
+    public void Parse_WithOws20Namespace_ReturnsReport()
+    {
+        var xml = """
+            <ows:ExceptionReport xmlns:ows="http://www.opengis.net/ows/2.0" version="2.0.1">
+                <ows:Exception exceptionCode="NoApplicableCode">
+                    <ows:ExceptionText>Failure</ows:ExceptionText>
+                </ows:Exception>
+            </ows:ExceptionReport>
+            """;
+
+        var report = OwsExceptionParser.Parse(xml);
+
+        report.Should().NotBeNull();
+        report!.Exceptions.Should().ContainSingle();
+        report.Exceptions[0].ExceptionCode.Should().Be("NoApplicableCode");
+    }
 }
