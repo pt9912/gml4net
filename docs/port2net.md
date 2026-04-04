@@ -214,7 +214,7 @@ public sealed class GmlGeometryProperty : GmlPropertyValue
 
 public sealed class GmlNestedProperty : GmlPropertyValue
 {
-    public required IReadOnlyDictionary<string, GmlPropertyValue> Children { get; init; }
+    public GmlPropertyBag Children { get; init; } = GmlPropertyBag.Empty;
 }
 
 public sealed class GmlRawXmlProperty : GmlPropertyValue
@@ -728,8 +728,7 @@ Das Projekt verwendet `<Nullable>enable</Nullable>`. Alle optionalen Felder sind
 public sealed class GmlFeature : GmlNode, IGmlRootContent
 {
     public string? Id { get; init; }  // Optional wie in Dart
-    public IReadOnlyDictionary<string, GmlPropertyValue> Properties { get; init; }
-        = ImmutableDictionary<string, GmlPropertyValue>.Empty;
+    public GmlPropertyBag Properties { get; init; } = GmlPropertyBag.Empty;
 }
 ```
 

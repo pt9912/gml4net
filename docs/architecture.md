@@ -284,11 +284,13 @@ GmlPropertyValue (abstract)
 ├── GmlStringProperty        { string Value }
 ├── GmlNumericProperty       { double Value }
 ├── GmlGeometryProperty      { GmlGeometry Geometry }
-├── GmlNestedProperty        { IReadOnlyDictionary<string, GmlPropertyValue> Children }
+├── GmlNestedProperty        { GmlPropertyBag Children }
 └── GmlRawXmlProperty        { string XmlContent }
 ```
 
-`GmlFeature` enthaelt `IReadOnlyDictionary<string, GmlPropertyValue> Properties`.
+`GmlFeature` enthaelt `GmlPropertyBag Properties`, das Reihenfolge und
+Mehrfach-Properties erhaelt und zugleich Lookup auf den ersten Wert pro Name
+anbietet.
 
 #### 3.5 Dokument-Root
 
