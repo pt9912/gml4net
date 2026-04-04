@@ -1,0 +1,60 @@
+## .NET
+bin/
+obj/
+publish/
+
+## NuGet
+*.nupkg
+*.snupkg
+**/packages/
+
+## IDE
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.idea/
+*.swp
+*~
+
+## Rider
+*.sln.iml
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Test results
+[Tt]est[Rr]esult*/
+*.trx
+coverage/
+*.coveragexml
+*.coverage
+
+## OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+## dotnet tools
+.config/dotnet-tools.json
+
+## User secrets
+secrets.json
+
+## AI tool config
+.claude/
+.codex
