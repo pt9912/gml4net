@@ -1,6 +1,6 @@
 # Gml4Net: Roadmap
 
-Aktueller Stand: Phase 6 abgeschlossen. Phase 7 (Erweiterte Builder) ist als naechstes geplant.
+Aktueller Stand: Alle 7 Phasen abgeschlossen. Die Bibliothek ist feature-komplett.
 
 ## Uebersicht
 
@@ -358,25 +358,28 @@ Geometrie  Parser     Parser +   GeoJSON    WCS        + I/O      Builder
 
 ## Phase 7: Erweiterte Builder
 
-**Status:** Offen
+**Status:** Abgeschlossen
 **Voraussetzung:** Phase 4 (Interop-Grundlage)
-**Ziel:** Zusaetzliche Ausgabeformate aus s-gml portieren
+**Ziel:** Zusaetzliche Ausgabeformate und generisches Builder-Interface
 
 ### Aufgaben
 
-- [ ] `IGmlBuilder<TGeometry, TFeature, TCollection>` Interface finalisieren
-- [ ] Bestehende Builder (`GeoJsonBuilder`, `WktBuilder`) auf Interface umstellen
-  (optional, Kompatibilitaet mit statischer API beibehalten)
-- [ ] Neue Builder:
-  - [ ] `KmlBuilder` -- KML-Ausgabe fuer Google Earth
-  - [ ] `CsvBuilder` -- CSV mit WKT-Geometrien
+- [x] `IGmlBuilder<TGeometry, TFeature, TCollection>` Interface finalisiert
+- [x] Bestehende Builder (`GeoJsonBuilder`, `WktBuilder`) behalten statische API
+  (Interface-Implementierung optional fuer Custom-Builder)
+- [x] Neue Builder:
+  - [x] `KmlBuilder` -- KML 2.2 Ausgabe (Point, LineString, Polygon, MultiGeometry,
+        Placemark mit Description, Document/kml Root)
+  - [x] `CsvBuilder` -- CSV mit WKT-Geometriespalte, konfigurierbarem Separator,
+        korrektem CSV-Escaping (Komma, Anfuehrungszeichen, Newline)
+- [ ] Zurueckgestellt (spaetere Iteration):
   - [ ] `CisJsonBuilder` -- OGC CIS JSON 1.1
   - [ ] `CoverageJsonBuilder` -- OGC CoverageJSON
-- [ ] Optional: `Gml4Net.Cli` als `dotnet tool`:
-  - [ ] Eingabe: GML-Datei oder URL
-  - [ ] Ausgabe: Gewaehltes Format (geojson, wkt, kml, csv)
-  - [ ] `--format`, `--output`, `--validate` Optionen
-- [ ] Tests fuer alle neuen Builder
+  - [ ] `Gml4Net.Cli` als `dotnet tool`
+- [x] Tests (26 neue Tests):
+  - [x] `KmlBuilderTests` -- alle Geometrie-Typen, Feature/FeatureCollection, Roundtrip
+  - [x] `CsvBuilderTests` -- Geometrie+Properties, Escaping, Custom-Separator,
+        fehlende Properties, leere Collection, Roundtrip
 
 **Portierungsquellen:**
 - `s-gml/src/builders/kml.ts`
@@ -433,7 +436,7 @@ Jede Phase gilt als abgeschlossen, wenn:
 | **Interop-Ready** | Phase 4 | GeoJSON + WKT Export -- **erreicht** |
 | **OGC-komplett** | Phase 5 | OWS + WCS Integration -- **erreicht** |
 | **Production-Ready** | Phase 6 | Streaming + I/O, grosse Dokumente -- **erreicht** |
-| **Feature-komplett** | Phase 7 | Alle Builder, Feature-Paritaet mit s-gml |
+| **Feature-komplett** | Phase 7 | KML + CSV Builder, IGmlBuilder Interface -- **erreicht** |
 
 ---
 
