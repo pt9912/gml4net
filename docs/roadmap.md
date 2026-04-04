@@ -1,6 +1,6 @@
 # Gml4Net: Roadmap
 
-Aktueller Stand: Phase 4 abgeschlossen. Phase 5 (OWS + WCS) ist als naechstes geplant.
+Aktueller Stand: Phase 5 abgeschlossen. Phase 6 (Streaming + I/O) ist als naechstes geplant.
 
 ## Uebersicht
 
@@ -248,35 +248,35 @@ Geometrie  Parser     Parser +   GeoJSON    WCS        + I/O      Builder
 
 ## Phase 5: OWS + WCS
 
-**Status:** Offen
+**Status:** Abgeschlossen
 **Voraussetzung:** Phase 3 (Coverage-Modell)
 **Ziel:** OGC-Webdienste ansprechen und Fehler verarbeiten koennen
 
 ### Aufgaben
 
-- [ ] `OwsExceptionParser`:
-  - [ ] `IsOwsExceptionReport()` -- Root-Element pruefen
-  - [ ] `Parse()` -- ExceptionReport mit Exceptions extrahieren
-  - [ ] Modelle: `OwsException`, `OwsExceptionReport`
-- [ ] `WcsRequestBuilder`:
-  - [ ] Konstruktor mit baseUrl und WcsVersion
-  - [ ] `BuildGetCoverageUrl()` -- URL mit Query-Parametern
-    - Versionsabhaengige Parameternamen
+- [x] `OwsExceptionParser`:
+  - [x] `IsOwsExceptionReport()` -- Root-Element pruefen
+  - [x] `Parse()` -- ExceptionReport mit Exceptions extrahieren
+  - [x] Modelle: `OwsException`, `OwsExceptionReport`
+- [x] `WcsRequestBuilder`:
+  - [x] Konstruktor mit baseUrl und WcsVersion
+  - [x] `BuildGetCoverageUrl()` -- URL mit Query-Parametern
+    - Versionsabhaengige Parameternamen (coverage/identifier/CoverageId)
     - Subset-Encoding als wiederholte Parameter
-  - [ ] `BuildGetCoverageXml()` -- XML-Body fuer WCS 2.0+ POST
-  - [ ] Modelle: `WcsVersion`, `WcsSubset`, `WcsGetCoverageOptions`
-- [ ] `WcsCapabilitiesParser`:
-  - [ ] `Parse()` -- GetCapabilities-XML auswerten
-  - [ ] ServiceIdentification (Title, Abstract, Keywords)
-  - [ ] Operations (GET/POST URLs)
-  - [ ] Coverage-Summaries (ID, Subtype, Bounds)
-  - [ ] Supported Formats und CRS
-  - [ ] Modelle: `WcsCapabilities`, `WcsServiceIdentification`,
+  - [x] `BuildGetCoverageXml()` -- XML-Body fuer WCS 2.0+ POST (DimensionTrim/SlicePoint)
+  - [x] Modelle: `WcsVersion`, `WcsSubset`, `WcsGetCoverageOptions`
+- [x] `WcsCapabilitiesParser`:
+  - [x] `Parse()` -- GetCapabilities-XML auswerten
+  - [x] ServiceIdentification (Title, Abstract, Keywords)
+  - [x] Operations (GET/POST URLs via xlink:href)
+  - [x] Coverage-Summaries (ID, Subtype, WGS84BoundingBox)
+  - [x] Supported Formats und CRS
+  - [x] Modelle: `WcsCapabilities`, `WcsServiceIdentification`,
         `WcsOperationMetadata`, `WcsCoverageSummary`
-- [ ] Tests:
-  - [ ] `OwsExceptionTests` -- Erkennung, Parsing, mehrere Exceptions
-  - [ ] `WcsRequestBuilderTests` -- URL + XML, verschiedene Versionen
-  - [ ] `WcsCapabilitiesParserTests` -- WCS 1.0, 1.1, 2.0
+- [x] Tests (25 neue Tests):
+  - [x] `OwsExceptionTests` -- Erkennung, Parsing, mehrere Exceptions, Edge Cases
+  - [x] `WcsRequestBuilderTests` -- URL + XML, V1.0/V1.1/V2.0, Subsets, alle Optionen
+  - [x] `WcsCapabilitiesParserTests` -- vollstaendiges Capabilities-Dokument, minimal, CRS
 
 **Portierungsquellen:**
 - `gml4dart/lib/src/ows/ows_exception.dart`
@@ -419,7 +419,7 @@ Jede Phase gilt als abgeschlossen, wenn:
 | **WFS-Ready** | Phase 2 | FeatureCollections aus WFS-Antworten parsbar -- **erreicht** |
 | **Coverage-Ready** | Phase 3 | OGC Coverages parsbar und erzeugbar -- **erreicht** |
 | **Interop-Ready** | Phase 4 | GeoJSON + WKT Export -- **erreicht** |
-| **OGC-komplett** | Phase 5 | OWS + WCS Integration |
+| **OGC-komplett** | Phase 5 | OWS + WCS Integration -- **erreicht** |
 | **Production-Ready** | Phase 6 | Streaming + I/O, grosse Dokumente |
 | **Feature-komplett** | Phase 7 | Alle Builder, Feature-Paritaet mit s-gml |
 
