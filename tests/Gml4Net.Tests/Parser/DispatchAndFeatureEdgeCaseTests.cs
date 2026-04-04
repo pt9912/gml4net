@@ -164,7 +164,7 @@ public class DispatchAndFeatureEdgeCaseTests
         var result = GmlParser.ParseXmlString(xml);
 
         var feature = (result.Document!.Root as GmlFeatureCollection)!.Features[0];
-        feature.Properties.Should().ContainKey("tag");
+        feature.Properties.ContainsKey("tag").Should().BeTrue();
         feature.Properties.Entries.Should().HaveCount(3);
         feature.Properties.GetValues("tag").Should().HaveCount(3);
         feature.Properties.GetValues("tag")[0].Should().BeOfType<GmlStringProperty>()
@@ -222,8 +222,8 @@ public class DispatchAndFeatureEdgeCaseTests
         var result = GmlParser.ParseXmlString(xml);
 
         var feature = (result.Document!.Root as GmlFeatureCollection)!.Features[0];
-        feature.Properties.Should().NotContainKey("boundedBy");
-        feature.Properties.Should().ContainKey("name");
+        feature.Properties.ContainsKey("boundedBy").Should().BeFalse();
+        feature.Properties.ContainsKey("name").Should().BeTrue();
     }
 
     // ---- FeatureCollection with GML 2 Box in boundedBy ----
@@ -336,9 +336,32 @@ public class DispatchAndFeatureEdgeCaseTests
 
         var feature = (result.Document!.Root as GmlFeatureCollection)!.Features[0];
         var nested = feature.Properties["meta"].Should().BeOfType<GmlNestedProperty>().Subject;
-        nested.Children.Should().ContainKey("key");
+        nested.Children.ContainsKey("key").Should().BeTrue();
         nested.Children.Entries.Should().HaveCount(2);
         nested.Children.GetValues("key").Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void ParseFeature_WithLeadingZeroInteger_PreservesStringValue()
+    {
+        var xml = """
+            <wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0"
+                                   xmlns:gml="http://www.opengis.net/gml/3.2"
+                                   xmlns:app="http://example.com/app">
+                <wfs:member>
+                    <app:Item gml:id="item.1">
+                        <app:code>00123</app:code>
+                    </app:Item>
+                </wfs:member>
+            </wfs:FeatureCollection>
+            """;
+
+        var result = GmlParser.ParseXmlString(xml);
+
+        result.HasErrors.Should().BeFalse();
+        var feature = (result.Document!.Root as GmlFeatureCollection)!.Features[0];
+        feature.Properties["code"].Should().BeOfType<GmlStringProperty>()
+            .Which.Value.Should().Be("00123");
     }
 
     [Fact]

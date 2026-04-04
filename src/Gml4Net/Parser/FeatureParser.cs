@@ -209,7 +209,41 @@ internal static class FeatureParser
             return true;
         }
 
+        if (LooksLikeInteger(text))
+        {
+            var unsigned = text[0] is '+' or '-' ? text[1..] : text;
+            if (unsigned.Length > 1 && unsigned[0] == '0')
+                return false;
+
+            if (!long.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var integer))
+                return false;
+
+            const long maxExactInteger = 9_007_199_254_740_991;
+            if (Math.Abs(integer) > maxExactInteger)
+                return false;
+
+            value = integer;
+            return true;
+        }
+
         return false;
+    }
+
+    private static bool LooksLikeInteger(string text)
+    {
+        for (var i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            if (char.IsAsciiDigit(c))
+                continue;
+
+            if (c is '+' or '-' && i == 0)
+                continue;
+
+            return false;
+        }
+
+        return text.Length > 0 && text is not "+" and not "-";
     }
 
     private static bool LooksLikeFloatingPoint(string text)

@@ -46,7 +46,7 @@ public class FeatureParserTests
         fc.Features.Should().HaveCount(2);
 
         fc.Features[0].Id.Should().Be("building.1");
-        fc.Features[0].Properties.Should().ContainKey("name");
+        fc.Features[0].Properties.ContainsKey("name").Should().BeTrue();
         fc.Features[0].Properties["name"].Should().BeOfType<GmlStringProperty>()
             .Which.Value.Should().Be("Town Hall");
 
@@ -192,8 +192,8 @@ public class FeatureParserTests
             .Which.Value.Should().Be("Main St");
         address.Children["city"].Should().BeOfType<GmlStringProperty>()
             .Which.Value.Should().Be("Berlin");
-        address.Children["zip"].Should().BeOfType<GmlStringProperty>()
-            .Which.Value.Should().Be("10115");
+        address.Children["zip"].Should().BeOfType<GmlNumericProperty>()
+            .Which.Value.Should().Be(10115);
     }
 
     // ---- Feature Without Geometry ----
@@ -219,7 +219,7 @@ public class FeatureParserTests
         result.HasErrors.Should().BeFalse();
         var feature = (result.Document!.Root as GmlFeatureCollection)!.Features[0];
         feature.Properties.Should().HaveCount(2);
-        feature.Properties.Should().NotContainKey("geometry");
+        feature.Properties.ContainsKey("geometry").Should().BeFalse();
         feature.Properties["title"].Should().BeOfType<GmlStringProperty>()
             .Which.Value.Should().Be("Conference");
         feature.Properties["date"].Should().BeOfType<GmlStringProperty>()
@@ -280,8 +280,8 @@ public class FeatureParserTests
         feature.Id.Should().Be("building.99");
         feature.Properties["name"].Should().BeOfType<GmlStringProperty>()
             .Which.Value.Should().Be("Standalone Building");
-        feature.Properties["floors"].Should().BeOfType<GmlStringProperty>()
-            .Which.Value.Should().Be("3");
+        feature.Properties["floors"].Should().BeOfType<GmlNumericProperty>()
+            .Which.Value.Should().Be(3);
     }
 
     // ---- Empty FeatureCollection ----

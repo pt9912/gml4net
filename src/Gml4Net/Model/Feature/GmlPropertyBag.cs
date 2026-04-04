@@ -15,12 +15,12 @@ public sealed class GmlPropertyEntry
 }
 
 /// <summary>
-/// Ordered property bag with dictionary-style access for the first value of each name.
+/// Ordered property bag with convenience lookup helpers for the first value of each name.
 /// </summary>
-public sealed class GmlPropertyBag : IReadOnlyDictionary<string, GmlPropertyValue>
+public sealed class GmlPropertyBag : IReadOnlyList<GmlPropertyEntry>
 {
     private readonly IReadOnlyList<GmlPropertyEntry> _entries;
-    private readonly IReadOnlyDictionary<string, GmlPropertyValue> _lookup;
+    private readonly Dictionary<string, GmlPropertyValue> _lookup;
 
     /// <summary>An empty property bag.</summary>
     public static GmlPropertyBag Empty { get; } = new([]);
@@ -71,22 +71,23 @@ public sealed class GmlPropertyBag : IReadOnlyDictionary<string, GmlPropertyValu
     public GmlPropertyValue this[string key] => _lookup[key];
 
     /// <inheritdoc />
-    public IEnumerable<string> Keys => _lookup.Keys;
+    public int Count => _entries.Count;
 
-    /// <inheritdoc />
-    public IEnumerable<GmlPropertyValue> Values => _lookup.Values;
-
-    /// <inheritdoc />
-    public int Count => _lookup.Count;
-
-    /// <inheritdoc />
+    /// <summary>
+    /// Returns true when at least one property with the given name exists.
+    /// </summary>
     public bool ContainsKey(string key) => _lookup.ContainsKey(key);
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Tries to get the first property value with the given name.
+    /// </summary>
     public bool TryGetValue(string key, out GmlPropertyValue value) => _lookup.TryGetValue(key, out value!);
 
     /// <inheritdoc />
-    public IEnumerator<KeyValuePair<string, GmlPropertyValue>> GetEnumerator() => _lookup.GetEnumerator();
+    public GmlPropertyEntry this[int index] => _entries[index];
+
+    /// <inheritdoc />
+    public IEnumerator<GmlPropertyEntry> GetEnumerator() => _entries.GetEnumerator();
 
     /// <inheritdoc />
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
