@@ -1,5 +1,6 @@
 using System.Xml.Linq;
 using Gml4Net.Model;
+using Gml4Net.Model.Feature;
 using Gml4Net.Model.Geometry;
 
 namespace Gml4Net.Parser;
@@ -152,17 +153,19 @@ public static class GmlParser
             return GeometryParser.Parse(root, version, issues);
         }
 
-        // FeatureCollection — will be handled in Phase 2
-        // For now, recognize but report as unsupported
+        // FeatureCollection (GML or WFS root)
         if (localName == "FeatureCollection")
         {
-            issues.Add(new GmlParseIssue
-            {
-                Severity = GmlIssueSeverity.Info,
-                Code = "feature_collection_not_implemented",
-                Message = "FeatureCollection parsing is not yet implemented"
-            });
-            return null;
+            return FeatureParser.ParseCollection(root, version, issues);
+        }
+
+        // Single feature: non-GML/WFS root with properties
+        // Heuristic: if root is not in a GML/WFS namespace and has child elements,
+        // treat it as a standalone feature
+        if (!XmlHelpers.IsGmlNamespace(ns) && !XmlHelpers.IsWfsNamespace(ns)
+            && root.HasElements && !IsCoverageElement(localName))
+        {
+            return FeatureParser.ParseFeature(root, version, issues);
         }
 
         // Coverage types — will be handled in Phase 3

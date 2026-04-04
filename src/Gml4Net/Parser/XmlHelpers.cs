@@ -60,7 +60,7 @@ internal static class XmlHelpers
     internal static string? GetFeatureId(XElement element) =>
         element.Attribute(GmlNamespaces.NsGml32 + "id")?.Value
         ?? element.Attribute(GmlNamespaces.NsGml + "id")?.Value
-        ?? element.Attribute("gml:id")?.Value
+        ?? element.Attribute("id")?.Value
         ?? element.Attribute("fid")?.Value;
 
     /// <summary>

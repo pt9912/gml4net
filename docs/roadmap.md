@@ -1,6 +1,6 @@
 # Gml4Net: Roadmap
 
-Aktueller Stand: Phase 1 abgeschlossen. Phase 2 ist als naechstes geplant.
+Aktueller Stand: Phase 2 abgeschlossen. Phase 3 (Coverage-Parser) ist als naechstes geplant.
 
 ## Uebersicht
 
@@ -118,33 +118,39 @@ Geometrie  Parser     Parser +   GeoJSON    WCS        + I/O      Builder
 
 ## Phase 2: Feature-Parser + FeatureCollection
 
-**Status:** Offen
+**Status:** Abgeschlossen
 **Voraussetzung:** Phase 1
 **Ziel:** WFS-Antworten parsen koennen
 
 ### Aufgaben
 
-- [ ] `FeatureParser`:
-  - [ ] `ParseCollection()` -- FeatureCollection mit boundedBy
-  - [ ] `ParseFeature()` -- einzelnes Feature mit ID und Properties
-  - [ ] Feature-Member-Varianten: `gml:featureMember`, `wfs:member`,
+- [x] `FeatureParser`:
+  - [x] `ParseCollection()` -- FeatureCollection mit boundedBy
+  - [x] `ParseFeature()` -- einzelnes Feature mit ID und Properties
+  - [x] Feature-Member-Varianten: `gml:featureMember`, `wfs:member`,
         `gml:featureMembers` (Plural)
-- [ ] Property-Value-Parsing:
-  - [ ] Geometrie-Kinder erkennen → `GmlGeometryProperty`
-  - [ ] Verschachtelte Elemente → `GmlNestedProperty`
-  - [ ] Numerische Werte → `GmlNumericProperty`
-  - [ ] Text-Fallback → `GmlStringProperty`
-  - [ ] Nicht klassifizierbar → `GmlRawXmlProperty`
-- [ ] `GmlParser` Root-Dispatch erweitern:
-  - [ ] FeatureCollection erkennen
-  - [ ] Einzelnes Feature erkennen (kein featureMember-Wrapper)
-- [ ] `FeatureParserTests`:
-  - [ ] einfache FeatureCollection
-  - [ ] Feature mit gemischten Property-Typen
-  - [ ] WFS 1.0, 1.1, 2.0 Varianten
-  - [ ] verschachtelte Properties
-  - [ ] Feature ohne Geometrie
-  - [ ] boundedBy-Extraktion
+- [x] Property-Value-Parsing:
+  - [x] Geometrie-Kinder erkennen → `GmlGeometryProperty`
+  - [x] Verschachtelte Elemente → `GmlNestedProperty`
+  - [x] Numerische Werte → `GmlNumericProperty`
+  - [x] Text-Fallback → `GmlStringProperty`
+  - [x] Nicht klassifizierbar → `GmlRawXmlProperty`
+- [x] `GmlParser` Root-Dispatch erweitern:
+  - [x] FeatureCollection erkennen
+  - [x] Einzelnes Feature erkennen (kein featureMember-Wrapper)
+- [x] `FeatureParserTests` (12 Tests):
+  - [x] einfache FeatureCollection (WFS 2.0)
+  - [x] Feature mit gemischten Property-Typen
+  - [x] WFS 1.0/1.1 (`gml:featureMember` mit `fid`)
+  - [x] GML 3.1 `gml:featureMembers` (Plural)
+  - [x] verschachtelte Properties
+  - [x] Feature ohne Geometrie
+  - [x] boundedBy-Extraktion
+  - [x] Standalone Feature (ohne Collection-Wrapper)
+  - [x] Leere FeatureCollection
+  - [x] Feature mit Polygon-Geometrie
+  - [x] Gemischte Member-Varianten in einer Collection
+  - [x] Leere Property-Elemente
 
 **Portierungsquellen:**
 - `gml4dart/lib/src/parser/feature_parser.dart`
@@ -407,7 +413,7 @@ Jede Phase gilt als abgeschlossen, wenn:
 | Meilenstein | Phase | Beschreibung |
 |---|---|---|
 | **MVP** | Phase 1 | Geometrie-Parsing funktioniert, Modell steht -- **erreicht** |
-| **WFS-Ready** | Phase 2 | FeatureCollections aus WFS-Antworten parsbar |
+| **WFS-Ready** | Phase 2 | FeatureCollections aus WFS-Antworten parsbar -- **erreicht** |
 | **Coverage-Ready** | Phase 3 | OGC Coverages parsbar und erzeugbar |
 | **Interop-Ready** | Phase 4 | GeoJSON + WKT Export |
 | **OGC-komplett** | Phase 5 | OWS + WCS Integration |
