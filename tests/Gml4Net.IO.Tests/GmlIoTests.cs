@@ -250,6 +250,49 @@ public class GmlIoTests
         content.IsDisposed.Should().BeTrue();
     }
 
+    // ---- Null guards ----
+
+    [Fact]
+    public void ParseFile_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => GmlIo.ParseFile(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public async Task ParseFileAsync_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => GmlIo.ParseFileAsync(null!);
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact]
+    public async Task ParseUrlAsync_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => GmlIo.ParseUrlAsync(null!);
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact]
+    public async Task StreamFeaturesFromFile_WithNull_ThrowsArgumentNullException()
+    {
+        var act = async () =>
+        {
+            await foreach (var _ in GmlIo.StreamFeaturesFromFile(null!)) { }
+        };
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact]
+    public async Task StreamFeaturesFromUrl_WithNull_ThrowsArgumentNullException()
+    {
+        var act = async () =>
+        {
+            await foreach (var _ in GmlIo.StreamFeaturesFromUrl(null!)) { }
+        };
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
     // ---- Helpers ----
 
     private static string WriteTempFile(string content)

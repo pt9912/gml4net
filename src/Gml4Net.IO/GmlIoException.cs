@@ -4,7 +4,7 @@ namespace Gml4Net.IO;
 /// Exception for transport-level errors in the I/O layer.
 /// Distinct from <see cref="Gml4Net.Model.GmlParseIssue"/> which handles parse-level diagnostics.
 /// </summary>
-public class GmlIoException : Exception
+public sealed class GmlIoException : Exception
 {
     /// <summary>
     /// Machine-readable error code ("file_not_found", "file_read_error", "http_error", "network_error", "ows_exception").
@@ -26,6 +26,7 @@ public class GmlIoException : Exception
     public GmlIoException(string errorCode, string message, Exception? innerException = null, int? httpStatusCode = null)
         : base(message, innerException)
     {
+        ArgumentNullException.ThrowIfNull(errorCode);
         ErrorCode = errorCode;
         HttpStatusCode = httpStatusCode;
     }

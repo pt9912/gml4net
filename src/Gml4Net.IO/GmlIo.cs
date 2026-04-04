@@ -209,6 +209,7 @@ public static class GmlIo
         }
     }
 
+    /// <summary>Sends an HTTP GET request, wrapping HttpRequestException as GmlIoException.</summary>
     private static async Task<HttpResponseMessage> GetResponseAsync(
         HttpClient client,
         Uri url,
@@ -225,6 +226,7 @@ public static class GmlIo
         }
     }
 
+    /// <summary>Throws GmlIoException with http_error code if the response status is not 2xx.</summary>
     private static void EnsureSuccessStatusCode(HttpResponseMessage response, Uri url)
     {
         if (!response.IsSuccessStatusCode)
@@ -235,6 +237,7 @@ public static class GmlIo
         }
     }
 
+    /// <summary>Converts an OWS ExceptionReport into a GmlParseResult with Error-severity issues.</summary>
     private static GmlParseResult CreateOwsIssueResult(OwsExceptionReport report)
     {
         var issues = report.Exceptions.Select(ex => new GmlParseIssue
@@ -248,6 +251,7 @@ public static class GmlIo
         return new GmlParseResult { Issues = issues };
     }
 
+    /// <summary>Creates a GmlIoException with ows_exception error code from an OWS ExceptionReport.</summary>
     private static GmlIoException CreateOwsException(OwsExceptionReport report)
     {
         var first = report.Exceptions.FirstOrDefault();
@@ -262,6 +266,7 @@ public static class GmlIo
         return new GmlIoException("ows_exception", message);
     }
 
+    /// <summary>Advances the reader to the first Element node, returning false if none found.</summary>
     private static async Task<bool> MoveToFirstElementAsync(XmlReader reader)
     {
         while (await reader.ReadAsync().ConfigureAwait(false))
@@ -273,6 +278,7 @@ public static class GmlIo
         return false;
     }
 
+    /// <summary>Returns true if the reader is positioned on an OWS ExceptionReport root element.</summary>
     private static bool IsOwsExceptionReport(XmlReader reader) =>
         reader.LocalName == "ExceptionReport"
         && reader.NamespaceURI is GmlNamespaces.Ows or "http://www.opengis.net/ows/2.0";

@@ -242,6 +242,33 @@ public class StreamParserTests
         geometry.Version.Should().Be(GmlVersion.V3_1);
     }
 
+    // ---- Null guards ----
+
+    [Fact]
+    public async Task ParseAsync_WithNullStream_ThrowsArgumentNullException()
+    {
+        var act = async () =>
+        {
+            await foreach (var _ in GmlFeatureStreamParser.ParseAsync((Stream)null!)) { }
+        };
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact]
+    public async Task ProcessFeaturesAsync_WithNullStream_ThrowsArgumentNullException()
+    {
+        var act = () => GmlFeatureStreamParser.ProcessFeaturesAsync(null!, _ => Task.CompletedTask);
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact]
+    public async Task ProcessFeaturesAsync_WithNullCallback_ThrowsArgumentNullException()
+    {
+        using var stream = ToStream("<root/>");
+        var act = () => GmlFeatureStreamParser.ProcessFeaturesAsync(stream, null!);
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
     // ---- Helpers ----
 
     private static MemoryStream ToStream(string xml) =>

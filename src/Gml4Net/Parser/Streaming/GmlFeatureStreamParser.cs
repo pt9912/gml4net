@@ -193,6 +193,7 @@ public static class GmlFeatureStreamParser
     private static bool IsGmlOrWfsElement(XmlReader reader) =>
         XmlHelpers.IsGmlNamespace(reader.NamespaceURI) || XmlHelpers.IsWfsNamespace(reader.NamespaceURI);
 
+    /// <summary>Returns true if the local name suggests GML 2 content (lightweight check for streaming).</summary>
     private static bool LooksLikeGml2Indicator(string localName) =>
         localName is "coordinates" or "Box" or "outerBoundaryIs";
 }
