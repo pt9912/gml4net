@@ -1,6 +1,8 @@
 using System.Text;
 using FluentAssertions;
+using Gml4Net.Model;
 using Gml4Net.Model.Feature;
+using Gml4Net.Model.Geometry;
 using Gml4Net.Parser;
 using Gml4Net.Parser.Streaming;
 using Xunit;
@@ -186,6 +188,58 @@ public class StreamParserTests
         var features = await CollectAsync(GmlFeatureStreamParser.ParseAsync(stream));
 
         features.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ParseAsync_WithGml2Geometry_SetsGeometryVersionToV2_1_2()
+    {
+        var xml = """
+            <gml:FeatureCollection xmlns:gml="http://www.opengis.net/gml"
+                                   xmlns:app="http://example.com/app">
+                <gml:featureMember>
+                    <app:Road fid="road.1">
+                        <app:shape>
+                            <gml:Point>
+                                <gml:coordinates>10.0,20.0</gml:coordinates>
+                            </gml:Point>
+                        </app:shape>
+                    </app:Road>
+                </gml:featureMember>
+            </gml:FeatureCollection>
+            """;
+        using var stream = ToStream(xml);
+
+        var features = await CollectAsync(GmlFeatureStreamParser.ParseAsync(stream));
+
+        var geometry = features[0].Properties["shape"].Should().BeOfType<GmlGeometryProperty>().Subject.Geometry;
+        geometry.Should().BeOfType<GmlPoint>();
+        geometry.Version.Should().Be(GmlVersion.V2_1_2);
+    }
+
+    [Fact]
+    public async Task ParseAsync_WithLegacyGml31Geometry_SetsGeometryVersionToV3_1()
+    {
+        var xml = """
+            <gml:FeatureCollection xmlns:gml="http://www.opengis.net/gml"
+                                   xmlns:app="http://example.com/app">
+                <gml:featureMember>
+                    <app:Road fid="road.1">
+                        <app:shape>
+                            <gml:Point>
+                                <gml:pos>10.0 20.0</gml:pos>
+                            </gml:Point>
+                        </app:shape>
+                    </app:Road>
+                </gml:featureMember>
+            </gml:FeatureCollection>
+            """;
+        using var stream = ToStream(xml);
+
+        var features = await CollectAsync(GmlFeatureStreamParser.ParseAsync(stream));
+
+        var geometry = features[0].Properties["shape"].Should().BeOfType<GmlGeometryProperty>().Subject.Geometry;
+        geometry.Should().BeOfType<GmlPoint>();
+        geometry.Version.Should().Be(GmlVersion.V3_1);
     }
 
     // ---- Helpers ----

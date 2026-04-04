@@ -7,7 +7,7 @@ namespace Gml4Net.IO;
 public class GmlIoException : Exception
 {
     /// <summary>
-    /// Machine-readable error code ("file_not_found", "file_read_error", "http_error", "network_error").
+    /// Machine-readable error code ("file_not_found", "file_read_error", "http_error", "network_error", "ows_exception").
     /// </summary>
     public string ErrorCode { get; }
 

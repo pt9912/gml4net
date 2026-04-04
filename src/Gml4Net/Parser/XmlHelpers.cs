@@ -95,6 +95,15 @@ internal static class XmlHelpers
         if (root is null)
             return GmlVersion.V3_2;
 
+        return DetectVersion(root);
+    }
+
+    /// <summary>
+    /// Detects the GML version from namespace declarations in an element subtree.
+    /// Returns the supplied fallback version if no GML namespace is found.
+    /// </summary>
+    internal static GmlVersion DetectVersion(XElement root, GmlVersion fallbackVersion = GmlVersion.V3_2)
+    {
         bool hasGml = false;
         bool hasGml2Indicators = false;
 
@@ -129,7 +138,7 @@ internal static class XmlHelpers
         if (hasGml)
             return hasGml2Indicators ? GmlVersion.V2_1_2 : GmlVersion.V3_1;
 
-        return GmlVersion.V3_2;
+        return fallbackVersion;
     }
 
     /// <summary>

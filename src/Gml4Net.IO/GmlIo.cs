@@ -1,9 +1,11 @@
 using System.Runtime.CompilerServices;
+using System.Xml;
 using Gml4Net.Model;
 using Gml4Net.Model.Feature;
 using Gml4Net.Ows;
 using Gml4Net.Parser;
 using Gml4Net.Parser.Streaming;
+using System.Xml.Linq;
 
 namespace Gml4Net.IO;
 
@@ -96,22 +98,8 @@ public static class GmlIo
 
         try
         {
-            HttpResponseMessage response;
-            try
-            {
-                response = await client.GetAsync(url, ct).ConfigureAwait(false);
-            }
-            catch (HttpRequestException ex)
-            {
-                throw new GmlIoException("network_error", $"Network error fetching {url}: {ex.Message}", ex);
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new GmlIoException("http_error",
-                    $"HTTP {(int)response.StatusCode} from {url}",
-                    httpStatusCode: (int)response.StatusCode);
-            }
+            using var response = await GetResponseAsync(client, url, HttpCompletionOption.ResponseContentRead, ct).ConfigureAwait(false);
+            EnsureSuccessStatusCode(response, url);
 
             var content = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
@@ -120,17 +108,7 @@ public static class GmlIo
             {
                 var report = OwsExceptionParser.Parse(content);
                 if (report is not null)
-                {
-                    var issues = report.Exceptions.Select(ex => new GmlParseIssue
-                    {
-                        Severity = GmlIssueSeverity.Error,
-                        Code = ex.ExceptionCode,
-                        Message = string.Join("; ", ex.ExceptionTexts),
-                        Location = ex.Locator
-                    }).ToList();
-
-                    return new GmlParseResult { Issues = issues };
-                }
+                    return CreateOwsIssueResult(report);
             }
 
             return GmlParser.ParseXmlString(content);
@@ -168,6 +146,10 @@ public static class GmlIo
         {
             throw new GmlIoException("file_read_error", $"Cannot read file: {path}", ex);
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            throw new GmlIoException("file_read_error", $"Access denied: {path}", ex);
+        }
 
         await using (stream.ConfigureAwait(false))
         {
@@ -198,27 +180,23 @@ public static class GmlIo
 
         try
         {
-            HttpResponseMessage response;
-            try
-            {
-                response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-            }
-            catch (HttpRequestException ex)
-            {
-                throw new GmlIoException("network_error", $"Network error fetching {url}: {ex.Message}", ex);
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new GmlIoException("http_error",
-                    $"HTTP {(int)response.StatusCode} from {url}",
-                    httpStatusCode: (int)response.StatusCode);
-            }
+            using var response = await GetResponseAsync(client, url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            EnsureSuccessStatusCode(response, url);
 
             var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             await using (stream.ConfigureAwait(false))
             {
-                await foreach (var feature in GmlFeatureStreamParser.ParseAsync(stream, ct).ConfigureAwait(false))
+                using var reader = GmlFeatureStreamParser.CreateReader(stream);
+                if (await MoveToFirstElementAsync(reader).ConfigureAwait(false)
+                    && IsOwsExceptionReport(reader))
+                {
+                    var reportElement = (XElement)await XNode.ReadFromAsync(reader, ct).ConfigureAwait(false);
+                    var report = OwsExceptionParser.Parse(reportElement.ToString(SaveOptions.DisableFormatting));
+                    if (report is not null)
+                        throw CreateOwsException(report);
+                }
+
+                await foreach (var feature in GmlFeatureStreamParser.ParseAsync(reader, ct).ConfigureAwait(false))
                 {
                     yield return feature;
                 }
@@ -230,4 +208,72 @@ public static class GmlIo
                 client.Dispose();
         }
     }
+
+    private static async Task<HttpResponseMessage> GetResponseAsync(
+        HttpClient client,
+        Uri url,
+        HttpCompletionOption completionOption,
+        CancellationToken ct)
+    {
+        try
+        {
+            return await client.GetAsync(url, completionOption, ct).ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new GmlIoException("network_error", $"Network error fetching {url}: {ex.Message}", ex);
+        }
+    }
+
+    private static void EnsureSuccessStatusCode(HttpResponseMessage response, Uri url)
+    {
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new GmlIoException("http_error",
+                $"HTTP {(int)response.StatusCode} from {url}",
+                httpStatusCode: (int)response.StatusCode);
+        }
+    }
+
+    private static GmlParseResult CreateOwsIssueResult(OwsExceptionReport report)
+    {
+        var issues = report.Exceptions.Select(ex => new GmlParseIssue
+        {
+            Severity = GmlIssueSeverity.Error,
+            Code = ex.ExceptionCode,
+            Message = string.Join("; ", ex.ExceptionTexts),
+            Location = ex.Locator
+        }).ToList();
+
+        return new GmlParseResult { Issues = issues };
+    }
+
+    private static GmlIoException CreateOwsException(OwsExceptionReport report)
+    {
+        var first = report.Exceptions.FirstOrDefault();
+        var code = first?.ExceptionCode ?? "ows_exception";
+        var text = first is null
+            ? "OWS ExceptionReport returned no exception details."
+            : string.Join("; ", first.ExceptionTexts.Where(t => !string.IsNullOrWhiteSpace(t)));
+        var message = string.IsNullOrWhiteSpace(text)
+            ? $"OWS exception returned from service: {code}"
+            : $"OWS exception returned from service: {code}: {text}";
+
+        return new GmlIoException("ows_exception", message);
+    }
+
+    private static async Task<bool> MoveToFirstElementAsync(XmlReader reader)
+    {
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            if (reader.NodeType == XmlNodeType.Element)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsOwsExceptionReport(XmlReader reader) =>
+        reader.LocalName == "ExceptionReport"
+        && reader.NamespaceURI is GmlNamespaces.Ows or "http://www.opengis.net/ows/2.0";
 }

@@ -194,6 +194,62 @@ public class GmlIoTests
             .Where(e => e.ErrorCode == "http_error" && e.HttpStatusCode == 500);
     }
 
+    [Fact]
+    public async Task StreamFeaturesFromUrl_WithOwsExceptionReport_ThrowsGmlIoException()
+    {
+        var owsXml = """
+            <ows:ExceptionReport xmlns:ows="http://www.opengis.net/ows/2.0" version="2.0.1">
+                <ows:Exception exceptionCode="InvalidParameterValue" locator="coverageId">
+                    <ows:ExceptionText>Coverage not found</ows:ExceptionText>
+                </ows:Exception>
+            </ows:ExceptionReport>
+            """;
+        var handler = new MockHttpHandler(owsXml, HttpStatusCode.OK);
+        var client = new HttpClient(handler);
+
+        var act = async () =>
+        {
+            await foreach (var _ in GmlIo.StreamFeaturesFromUrl(new Uri("https://example.com/wcs"), client)) { }
+        };
+
+        await act.Should().ThrowAsync<GmlIoException>()
+            .Where(e => e.ErrorCode == "ows_exception" && e.Message.Contains("InvalidParameterValue"));
+    }
+
+    [Fact]
+    public async Task ParseUrlAsync_DisposesResponseContent()
+    {
+        var content = new TrackingStringContent(SampleGml);
+        var handler = new MockHttpHandler(content, HttpStatusCode.OK);
+        var client = new HttpClient(handler);
+
+        await GmlIo.ParseUrlAsync(new Uri("https://example.com/wfs"), client);
+
+        content.IsDisposed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task StreamFeaturesFromUrl_DisposesResponseContent_WhenEnumerationStopsEarly()
+    {
+        var content = new TrackingStringContent("""
+            <wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0"
+                                   xmlns:gml="http://www.opengis.net/gml/3.2"
+                                   xmlns:app="http://example.com/app">
+                <wfs:member><app:City gml:id="city.1"><app:name>Munich</app:name></app:City></wfs:member>
+                <wfs:member><app:City gml:id="city.2"><app:name>Berlin</app:name></app:City></wfs:member>
+            </wfs:FeatureCollection>
+            """);
+        var handler = new MockHttpHandler(content, HttpStatusCode.OK);
+        var client = new HttpClient(handler);
+
+        await foreach (var _ in GmlIo.StreamFeaturesFromUrl(new Uri("https://example.com/wfs"), client))
+        {
+            break;
+        }
+
+        content.IsDisposed.Should().BeTrue();
+    }
+
     // ---- Helpers ----
 
     private static string WriteTempFile(string content)
@@ -203,15 +259,45 @@ public class GmlIoTests
         return path;
     }
 
-    private sealed class MockHttpHandler(string responseBody, HttpStatusCode statusCode) : HttpMessageHandler
+    private sealed class MockHttpHandler : HttpMessageHandler
     {
+        private readonly HttpContent _content;
+        private readonly HttpStatusCode _statusCode;
+
+        public MockHttpHandler(string responseBody, HttpStatusCode statusCode)
+            : this(new StringContent(responseBody, Encoding.UTF8, "application/xml"), statusCode)
+        {
+        }
+
+        public MockHttpHandler(HttpContent content, HttpStatusCode statusCode)
+        {
+            _content = content;
+            _statusCode = statusCode;
+        }
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
-            var response = new HttpResponseMessage(statusCode)
+            var response = new HttpResponseMessage(_statusCode)
             {
-                Content = new StringContent(responseBody, Encoding.UTF8, "application/xml")
+                Content = _content
             };
             return Task.FromResult(response);
+        }
+    }
+
+    private sealed class TrackingStringContent : StringContent
+    {
+        public TrackingStringContent(string content)
+            : base(content, Encoding.UTF8, "application/xml")
+        {
+        }
+
+        public bool IsDisposed { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            IsDisposed = true;
+            base.Dispose(disposing);
         }
     }
 }

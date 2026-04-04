@@ -25,18 +25,46 @@ public static class GmlFeatureStreamParser
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        using var reader = XmlReader.Create(stream, new XmlReaderSettings
+        using var reader = CreateReader(stream);
+
+        await foreach (var feature in ParseAsync(reader, ct).ConfigureAwait(false))
+        {
+            yield return feature;
+        }
+    }
+
+    /// <summary>
+    /// Creates a configured forward-only XML reader for streaming parsing.
+    /// </summary>
+    internal static XmlReader CreateReader(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        return XmlReader.Create(stream, new XmlReaderSettings
         {
             Async = true,
             DtdProcessing = DtdProcessing.Ignore,
             IgnoreWhitespace = true
         });
+    }
+
+    /// <summary>
+    /// Asynchronously streams features from an existing XML reader.
+    /// The reader may already be positioned on the document root element.
+    /// </summary>
+    internal static async IAsyncEnumerable<GmlFeature> ParseAsync(
+        XmlReader reader,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
 
         var version = GmlVersion.V3_2;
         var versionDetected = false;
+        var processCurrentElement = reader.NodeType == XmlNodeType.Element;
 
-        while (await reader.ReadAsync().ConfigureAwait(false))
+        while (processCurrentElement || await reader.ReadAsync().ConfigureAwait(false))
         {
+            processCurrentElement = false;
             ct.ThrowIfCancellationRequested();
 
             if (reader.NodeType != XmlNodeType.Element)
@@ -57,8 +85,9 @@ public static class GmlFeatureStreamParser
                     && !IsGmlOrWfsElement(reader))
                 {
                     var featureEl = (XElement)await XNode.ReadFromAsync(reader, ct).ConfigureAwait(false);
+                    var effectiveVersion = XmlHelpers.DetectVersion(featureEl, version);
                     var issues = new List<GmlParseIssue>();
-                    var feature = FeatureParser.ParseFeature(featureEl, version, issues);
+                    var feature = FeatureParser.ParseFeature(featureEl, effectiveVersion, issues);
                     if (feature is not null)
                         yield return feature;
                 }
@@ -77,7 +106,8 @@ public static class GmlFeatureStreamParser
                         || XmlHelpers.IsWfsNamespace(child.Name.NamespaceName))
                         continue;
 
-                    var feature = FeatureParser.ParseFeature(child, version, issues);
+                    var effectiveVersion = XmlHelpers.DetectVersion(child, version);
+                    var feature = FeatureParser.ParseFeature(child, effectiveVersion, issues);
                     if (feature is not null)
                         yield return feature;
                 }
@@ -117,6 +147,10 @@ public static class GmlFeatureStreamParser
         if (reader.NamespaceURI == GmlNamespaces.Gml32)
             return GmlVersion.V3_2;
 
+        var hasLegacyGml = reader.NamespaceURI == GmlNamespaces.Gml;
+        if (hasLegacyGml && LooksLikeGml2Indicator(reader.LocalName))
+            return GmlVersion.V2_1_2;
+
         // Check namespace declarations
         if (reader.MoveToFirstAttribute())
         {
@@ -124,11 +158,12 @@ public static class GmlFeatureStreamParser
             {
                 if (reader.Value == GmlNamespaces.Gml33) return GmlVersion.V3_3;
                 if (reader.Value == GmlNamespaces.Gml32) return GmlVersion.V3_2;
+                if (reader.Value == GmlNamespaces.Gml) hasLegacyGml = true;
             } while (reader.MoveToNextAttribute());
             reader.MoveToElement();
         }
 
-        return GmlVersion.V3_2;
+        return hasLegacyGml ? GmlVersion.V3_1 : GmlVersion.V3_2;
     }
 
     /// <summary>Returns true if the current element is a feature member wrapper (singular).</summary>
@@ -143,4 +178,7 @@ public static class GmlFeatureStreamParser
     /// <summary>Returns true if the current element is in a GML or WFS namespace.</summary>
     private static bool IsGmlOrWfsElement(XmlReader reader) =>
         XmlHelpers.IsGmlNamespace(reader.NamespaceURI) || XmlHelpers.IsWfsNamespace(reader.NamespaceURI);
+
+    private static bool LooksLikeGml2Indicator(string localName) =>
+        localName is "coordinates" or "Box" or "outerBoundaryIs";
 }

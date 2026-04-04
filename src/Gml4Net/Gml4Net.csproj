@@ -12,6 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Gml4Net.IO" />
     <InternalsVisibleTo Include="Gml4Net.Tests" />
   </ItemGroup>
 
