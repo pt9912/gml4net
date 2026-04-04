@@ -178,6 +178,7 @@ The repository now includes a multi-stage [Dockerfile](Dockerfile) for the plann
 - Package output stage: `artifacts`
 - Release target: `nuget.org`
 - Coverage gate in `test`: at least 90% line coverage
+- Public API XML documentation comments are required and missing comments fail the library build
 
 Example commands once the solution and projects exist:
 
@@ -195,6 +196,7 @@ Notes:
 - The example commands use `docker buildx build` because the Dockerfile relies on BuildKit features
 - The `test` stage enforces `/p:Threshold=90 /p:ThresholdType=line /p:ThresholdStat=total`
 - The current test project uses `coverlet.msbuild`; the 90% gate is enforced via the Docker test stage
+- The library project treats `CS1591` as an error, so missing XML comments on public APIs break the Docker build
 
 ## Requirements
 
