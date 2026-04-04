@@ -186,16 +186,10 @@ public static class GmlParser
             return FeatureParser.ParseCollection(root, version, issues);
         }
 
-        // Coverage types — will be handled in Phase 3
+        // Coverage types
         if ((XmlHelpers.IsGmlNamespace(ns) || ns == GmlNamespaces.Gmlcov) && IsCoverageElement(localName))
         {
-            issues.Add(new GmlParseIssue
-            {
-                Severity = GmlIssueSeverity.Error,
-                Code = "coverage_not_implemented",
-                Message = $"Coverage parsing is not yet implemented: {localName}"
-            });
-            return null;
+            return CoverageParser.Parse(root, version, issues);
         }
 
         // Single feature: non-GML/WFS root that looks like a feature

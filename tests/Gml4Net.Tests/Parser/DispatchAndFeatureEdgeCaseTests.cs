@@ -29,10 +29,10 @@ public class DispatchAndFeatureEdgeCaseTests
         result.Issues.Should().Contain(i => i.Code == "unknown_root");
     }
 
-    // ---- M7: Coverage dispatch ----
+    // ---- Coverage dispatch (now parsed, not stub) ----
 
     [Fact]
-    public void ParseXmlString_WithCoverageElement_ReturnsCoverageNotImplemented()
+    public void ParseXmlString_WithEmptyCoverage_ReturnsMissingDomainSet()
     {
         var xml = """
             <gml:RectifiedGridCoverage xmlns:gml="http://www.opengis.net/gml/3.2">
@@ -42,13 +42,12 @@ public class DispatchAndFeatureEdgeCaseTests
         var result = GmlParser.ParseXmlString(xml);
 
         result.HasErrors.Should().BeTrue();
-        result.Issues.Should().Contain(i => i.Code == "coverage_not_implemented");
-        // Should NOT also have unknown_root
+        result.Issues.Should().Contain(i => i.Code == "missing_domain_set");
         result.Issues.Should().NotContain(i => i.Code == "unknown_root");
     }
 
     [Fact]
-    public void ParseXmlString_WithGmlcovCoverage_ReturnsCoverageNotImplemented()
+    public void ParseXmlString_WithGmlcovCoverage_DispatchesToCoverageParser()
     {
         var xml = """
             <gmlcov:RectifiedGridCoverage xmlns:gmlcov="http://www.opengis.net/gmlcov/1.0">
@@ -58,7 +57,7 @@ public class DispatchAndFeatureEdgeCaseTests
         var result = GmlParser.ParseXmlString(xml);
 
         result.HasErrors.Should().BeTrue();
-        result.Issues.Should().Contain(i => i.Code == "coverage_not_implemented");
+        result.Issues.Should().Contain(i => i.Code == "missing_domain_set");
     }
 
     // ---- M6: Standalone feature heuristic ----

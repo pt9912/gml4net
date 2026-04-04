@@ -1,6 +1,6 @@
 # Gml4Net: Roadmap
 
-Aktueller Stand: Phase 2 abgeschlossen. Phase 3 (Coverage-Parser) ist als naechstes geplant.
+Aktueller Stand: Phase 3 abgeschlossen. Phase 4 (Interop: GeoJSON + WKT) ist als naechstes geplant.
 
 ## Uebersicht
 
@@ -162,38 +162,38 @@ Geometrie  Parser     Parser +   GeoJSON    WCS        + I/O      Builder
 
 ## Phase 3: Coverage-Parser
 
-**Status:** Offen
+**Status:** Abgeschlossen
 **Voraussetzung:** Phase 1
 **Ziel:** OGC Coverage-Dokumente parsen und erzeugen koennen
 
 ### Aufgaben
 
-- [ ] `CoverageParser`:
-  - [ ] `RectifiedGridCoverage` parsen (origin, offsetVectors, limits)
-  - [ ] `GridCoverage` parsen
-  - [ ] `ReferenceableGridCoverage` parsen
-  - [ ] `MultiPointCoverage` parsen
-  - [ ] boundedBy, rangeSet, rangeType extrahieren
-  - [ ] Grid-Modelle: dimension, limits (GridEnvelope), axisLabels
-  - [ ] RectifiedGrid: srsName, origin, offsetVectors (Affine)
-  - [ ] RangeSet: Inline-Daten und Datei-Referenzen
-  - [ ] RangeType: SWE DataRecord / RangeField-Definitionen
-- [ ] `CoverageGenerator`:
-  - [ ] GML 3.2 XML aus RectifiedGridCoverage erzeugen
-  - [ ] GML 3.2 XML aus GridCoverage erzeugen
-  - [ ] GML 3.2 XML aus ReferenceableGridCoverage erzeugen
-  - [ ] GML 3.2 XML aus MultiPointCoverage erzeugen
-  - [ ] Namespace-Deklarationen (gml, gmlcov, swe)
-- [ ] `GeoTiffUtils`:
-  - [ ] `ExtractMetadata()` -- Width, Height, CRS, Transform aus Coverage
-  - [ ] `PixelToWorld()` -- Affine Transformation
-  - [ ] `WorldToPixel()` -- inverse Transformation
-- [ ] `GmlParser` Root-Dispatch erweitern fuer Coverage-Typen
-- [ ] Tests:
-  - [ ] `CoverageParserTests` -- alle 4 Coverage-Typen
-  - [ ] `CoverageGeneratorTests` -- Roundtrip: Parse → Generate → Parse
-  - [ ] `GeoTiffMetadataTests` -- Metadaten-Extraktion, Koordinaten-Transform
-  - [ ] Edge Cases: fehlende Grids, leere RangeSets
+- [x] `CoverageParser`:
+  - [x] `RectifiedGridCoverage` parsen (origin, offsetVectors, limits)
+  - [x] `GridCoverage` parsen
+  - [x] `ReferenceableGridCoverage` parsen
+  - [x] `MultiPointCoverage` parsen
+  - [x] boundedBy, rangeSet, rangeType extrahieren
+  - [x] Grid-Modelle: dimension, limits (GridEnvelope), axisLabels
+  - [x] RectifiedGrid: srsName, origin, offsetVectors (Affine)
+  - [x] RangeSet: Inline-Daten und Datei-Referenzen
+  - [x] RangeType: SWE DataRecord / RangeField-Definitionen
+- [x] `CoverageGenerator`:
+  - [x] GML 3.2 XML aus RectifiedGridCoverage erzeugen
+  - [x] GML 3.2 XML aus GridCoverage erzeugen
+  - [x] GML 3.2 XML aus ReferenceableGridCoverage erzeugen
+  - [x] GML 3.2 XML aus MultiPointCoverage erzeugen
+  - [x] Namespace-Deklarationen (gml, gmlcov, swe)
+- [x] `GeoTiffUtils`:
+  - [x] `ExtractMetadata()` -- Width, Height, CRS, Transform aus Coverage
+  - [x] `PixelToWorld()` -- Affine Transformation
+  - [x] `WorldToPixel()` -- inverse Transformation
+- [x] `GmlParser` Root-Dispatch erweitern fuer Coverage-Typen
+- [x] Tests (27 neue Tests):
+  - [x] `CoverageParserTests` -- alle 4 Coverage-Typen + GMLCOV-Namespace + Edge Cases
+  - [x] `CoverageGeneratorTests` -- Roundtrip: Parse → Generate → Parse (alle 4 Typen)
+  - [x] `GeoTiffMetadataTests` -- Metadaten-Extraktion, PixelToWorld, WorldToPixel, Roundtrip, degenerierter Transform
+  - [x] Edge Cases: fehlende domainSets, fehlende Grids, leere RangeSets, origin ohne Point-Wrapper
 
 **Portierungsquellen:**
 - `gml4dart/lib/src/parser/coverage_parser.dart`
@@ -416,7 +416,7 @@ Jede Phase gilt als abgeschlossen, wenn:
 |---|---|---|
 | **MVP** | Phase 1 | Geometrie-Parsing funktioniert, Modell steht -- **erreicht** |
 | **WFS-Ready** | Phase 2 | FeatureCollections aus WFS-Antworten parsbar -- **erreicht** |
-| **Coverage-Ready** | Phase 3 | OGC Coverages parsbar und erzeugbar |
+| **Coverage-Ready** | Phase 3 | OGC Coverages parsbar und erzeugbar -- **erreicht** |
 | **Interop-Ready** | Phase 4 | GeoJSON + WKT Export |
 | **OGC-komplett** | Phase 5 | OWS + WCS Integration |
 | **Production-Ready** | Phase 6 | Streaming + I/O, grosse Dokumente |
