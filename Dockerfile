@@ -26,7 +26,21 @@ RUN dotnet build "${SOLUTION}" -c "${CONFIGURATION}" --no-restore
 FROM build AS test
 ARG SOLUTION=GML4Net.sln
 ARG CONFIGURATION=Release
-RUN dotnet test "${SOLUTION}" -c "${CONFIGURATION}" --no-build --logger "trx;LogFileName=test-results.trx"
+ARG COVERAGE_THRESHOLD=90
+ARG COVERAGE_THRESHOLD_TYPE=line
+ARG COVERAGE_THRESHOLD_STAT=total
+RUN mkdir -p /artifacts/test-results /artifacts/coverage
+RUN dotnet test "${SOLUTION}" \
+    -c "${CONFIGURATION}" \
+    --no-build \
+    --results-directory /artifacts/test-results \
+    --logger "trx;LogFileName=test-results.trx" \
+    /p:CollectCoverage=true \
+    /p:CoverletOutputFormat=cobertura \
+    /p:CoverletOutput=/artifacts/coverage/coverage \
+    /p:Threshold="${COVERAGE_THRESHOLD}" \
+    /p:ThresholdType="${COVERAGE_THRESHOLD_TYPE}" \
+    /p:ThresholdStat="${COVERAGE_THRESHOLD_STAT}"
 
 FROM build AS pack
 ARG SOLUTION=GML4Net.sln
