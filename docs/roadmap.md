@@ -1,6 +1,6 @@
 # Gml4Net: Roadmap
 
-Aktueller Stand: Phase 5 abgeschlossen. Phase 6 (Streaming + I/O) ist als naechstes geplant.
+Aktueller Stand: Phase 6 abgeschlossen. Phase 7 (Erweiterte Builder) ist als naechstes geplant.
 
 ## Uebersicht
 
@@ -289,7 +289,7 @@ Geometrie  Parser     Parser +   GeoJSON    WCS        + I/O      Builder
 
 ## Phase 6: Streaming + I/O
 
-**Status:** Offen
+**Status:** Abgeschlossen
 **Voraussetzung:** Phase 2 (Feature-Parser), Phase 5 (OWS fuer HTTP-Error-Detection)
 **Ziel:** Grosse Dokumente speichereffizient verarbeiten, Dateien und URLs laden
 
@@ -420,7 +420,7 @@ Jede Phase gilt als abgeschlossen, wenn:
 | **Coverage-Ready** | Phase 3 | OGC Coverages parsbar und erzeugbar -- **erreicht** |
 | **Interop-Ready** | Phase 4 | GeoJSON + WKT Export -- **erreicht** |
 | **OGC-komplett** | Phase 5 | OWS + WCS Integration -- **erreicht** |
-| **Production-Ready** | Phase 6 | Streaming + I/O, grosse Dokumente |
+| **Production-Ready** | Phase 6 | Streaming + I/O, grosse Dokumente -- **erreicht** |
 | **Feature-komplett** | Phase 7 | Alle Builder, Feature-Paritaet mit s-gml |
 
 ---
