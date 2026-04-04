@@ -103,10 +103,12 @@ Nachteil:
 
 ### 2. Echte Event-Writer unterhalb des Modells
 
-Dies ist der eigentliche Produktionspfad. Der Parser sendet strukturierte
-Ereignisse direkt an einen Writer. Im Gegensatz zum Feature-Sink liefert
-dieser Pfad keine fertigen `GmlGeometry`- oder `GmlFeature`-Objekte, sondern
-primitive Daten (Typnamen, Koordinaten, Property-Werte):
+Dies ist die moegliche spaetere Ausbaustufe fuer maximale Effizienz. Der
+Parser sendet strukturierte Ereignisse direkt an einen Writer. Im Gegensatz
+zum Feature-Sink liefert dieser Pfad keine fertigen `GmlGeometry`- oder
+`GmlFeature`-Objekte mehr. Wichtig ist dabei, dass die Geometriestruktur
+vollstaendig rekonstruiert werden kann, also nicht nur rohe Koordinaten,
+sondern auch Ring-, Patch- und Member-Grenzen transportiert werden.
 
 Beispiel:
 
@@ -117,18 +119,28 @@ public interface IGmlEventSink
     ValueTask OnStartFeatureCollectionAsync(string? id, CancellationToken ct = default);
     ValueTask OnStartFeatureAsync(string typeName, string? id, CancellationToken ct = default);
     ValueTask OnStartGeometryAsync(string geometryType, string? srsName, CancellationToken ct = default);
+    ValueTask OnStartGeometryPartAsync(string partKind, CancellationToken ct = default);
     ValueTask OnCoordinatesAsync(ReadOnlyMemory<GmlCoordinate> coordinates, CancellationToken ct = default);
+    ValueTask OnEndGeometryPartAsync(string partKind, CancellationToken ct = default);
     ValueTask OnEndGeometryAsync(CancellationToken ct = default);
-    ValueTask OnPropertyAsync(string name, GmlPropertyValue value, CancellationToken ct = default);
+    ValueTask OnPropertyScalarAsync(string name, object? value, CancellationToken ct = default);
+    ValueTask OnPropertyRawXmlAsync(string name, string xml, CancellationToken ct = default);
     ValueTask OnEndFeatureAsync(CancellationToken ct = default);
     ValueTask OnEndFeatureCollectionAsync(CancellationToken ct = default);
     ValueTask OnEndDocumentAsync(CancellationToken ct = default);
 }
 ```
 
+`partKind` steht dabei fuer semantische Grenzen wie `exteriorRing`,
+`interiorRing`, `polygon`, `curveMember` oder `surfacePatch`. Ohne diese
+Grenzen waeren `Polygon`, `MultiPolygon`, `Surface` und andere komplexe
+Geometrien nicht verlaesslich schreibbar.
+
 Unterschied zum Feature-Sink: Geometrien werden hier nicht als `GmlGeometry`
-materialisiert sondern als Typ+Koordinaten-Events geliefert. Property-Werte
-verwenden die bestehende `GmlPropertyValue`-Hierarchie fuer Typsicherheit.
+materialisiert, sondern als Struktur- und Koordinaten-Events geliefert.
+Property-Werte sind in dieser Stufe ebenfalls nicht mehr an die bestehende
+`GmlPropertyValue`-Hierarchie gebunden. Das ist bewusst eine andere, tiefere
+Vertragsebene als der bestehende Modellpfad.
 
 ## Empfohlene Einfuehrungsstrategie
 
@@ -203,7 +215,8 @@ Falls Messungen zeigen, dass selbst `GmlFeature` noch zu teuer ist:
 - Feature- und Property-Ereignisse unterhalb des Modells einfuehren via `IGmlEventSink`
 - direkte Writer fuer JSON/XML/CSV auf Parser-Ebene
 
-Das ist die teuerste Ausbaustufe und sollte benchmark-getrieben kommen.
+Das ist die teuerste Ausbaustufe und nicht die Default-Empfehlung, sondern
+eine gezielte Reaktion auf gemessene Produktionsanforderungen.
 
 ## Geeignete erste Zieltypen
 
