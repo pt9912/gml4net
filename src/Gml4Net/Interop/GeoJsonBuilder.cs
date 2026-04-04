@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json.Nodes;
 using Gml4Net.Model;
 using Gml4Net.Model.Feature;
@@ -176,37 +175,22 @@ public static class GeoJsonBuilder
     }
 
     /// <summary>Builds a GeoJSON Polygon rectangle from a GML Envelope.</summary>
-    private static JsonObject BuildEnvelope(GmlEnvelope env)
-    {
-        var ll = env.LowerCorner;
-        var ur = env.UpperCorner;
-        var ring = new JsonArray
-        {
-            CoordToArray(ll),
-            CoordToArray(new GmlCoordinate(ur.X, ll.Y)),
-            CoordToArray(ur),
-            CoordToArray(new GmlCoordinate(ll.X, ur.Y)),
-            CoordToArray(ll)
-        };
-
-        return new JsonObject
-        {
-            ["type"] = "Polygon",
-            ["coordinates"] = new JsonArray { ring }
-        };
-    }
+    private static JsonObject BuildEnvelope(GmlEnvelope env) =>
+        BuildBboxPolygon(env.LowerCorner, env.UpperCorner);
 
     /// <summary>Builds a GeoJSON Polygon rectangle from a GML 2 Box.</summary>
-    private static JsonObject BuildBox(GmlBox box)
+    private static JsonObject BuildBox(GmlBox box) =>
+        BuildBboxPolygon(box.LowerCorner, box.UpperCorner);
+
+    /// <summary>Builds a GeoJSON Polygon rectangle from lower/upper corner, preserving Z.</summary>
+    private static JsonObject BuildBboxPolygon(GmlCoordinate ll, GmlCoordinate ur)
     {
-        var ll = box.LowerCorner;
-        var ur = box.UpperCorner;
         var ring = new JsonArray
         {
             CoordToArray(ll),
-            CoordToArray(new GmlCoordinate(ur.X, ll.Y)),
+            CoordToArray(new GmlCoordinate(ur.X, ll.Y, ll.Z)),
             CoordToArray(ur),
-            CoordToArray(new GmlCoordinate(ll.X, ur.Y)),
+            CoordToArray(new GmlCoordinate(ll.X, ur.Y, ur.Z)),
             CoordToArray(ll)
         };
 
@@ -278,12 +262,17 @@ public static class GeoJsonBuilder
 
     // ---- Coordinate helpers ----
 
-    /// <summary>Converts a single coordinate to a JSON array [x, y] or [x, y, z].</summary>
+    /// <summary>Converts a single coordinate to a JSON array [x, y], [x, y, z], or [x, y, z, m].</summary>
     private static JsonArray CoordToArray(GmlCoordinate c)
     {
         var arr = new JsonArray { Num(c.X), Num(c.Y) };
         if (c.Z.HasValue)
             arr.Add(Num(c.Z.Value));
+        if (c.M.HasValue)
+        {
+            if (!c.Z.HasValue) arr.Add(Num(0)); // pad Z=0 before M per RFC 7946
+            arr.Add(Num(c.M.Value));
+        }
         return arr;
     }
 
@@ -293,7 +282,9 @@ public static class GeoJsonBuilder
 
     /// <summary>Creates a JsonValue from a double, using integer representation when possible.</summary>
     private static JsonValue Num(double d) =>
-        d == Math.Truncate(d) ? JsonValue.Create((long)d) : JsonValue.Create(d);
+        d == Math.Truncate(d) && d >= long.MinValue && d <= long.MaxValue && !double.IsInfinity(d)
+            ? JsonValue.Create((long)d)
+            : JsonValue.Create(d);
 
     // ---- Property conversion ----
 

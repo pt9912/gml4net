@@ -336,4 +336,115 @@ public class GeoJsonBuilderTests
         // Should be [10,20] not [10.0,20.0]
         jsonStr.Should().Contain("[10,20]");
     }
+
+    // ---- Null guards ----
+
+    [Fact]
+    public void Geometry_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => GeoJsonBuilder.Geometry(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Feature_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => GeoJsonBuilder.Feature(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void FeatureCollection_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => GeoJsonBuilder.FeatureCollection(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Document_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => GeoJsonBuilder.Document(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    // ---- Feature without geometry ----
+
+    [Fact]
+    public void Feature_WithoutGeometry_HasNullGeometry()
+    {
+        var feature = new GmlFeature
+        {
+            Properties = new Dictionary<string, GmlPropertyValue>
+            {
+                ["name"] = new GmlStringProperty { Value = "no-geom" }
+            }
+        };
+        var json = GeoJsonBuilder.Feature(feature);
+        var jsonStr = json.ToJsonString();
+
+        jsonStr.Should().Contain("\"geometry\":null");
+        json["properties"]!["name"]!.GetValue<string>().Should().Be("no-geom");
+    }
+
+    // ---- Feature without ID omits id field ----
+
+    [Fact]
+    public void Feature_WithoutId_OmitsIdField()
+    {
+        var feature = new GmlFeature();
+        var json = GeoJsonBuilder.Feature(feature);
+
+        json.ContainsKey("id").Should().BeFalse();
+    }
+
+    // ---- Document with single Feature ----
+
+    [Fact]
+    public void Document_WithSingleFeature_ReturnsFeature()
+    {
+        var doc = new GmlDocument
+        {
+            Version = GmlVersion.V3_2,
+            Root = new GmlFeature { Id = "f.1" }
+        };
+        var json = GeoJsonBuilder.Document(doc)!;
+
+        json["type"]!.GetValue<string>().Should().Be("Feature");
+        json["id"]!.GetValue<string>().Should().Be("f.1");
+    }
+
+    // ---- M-Coordinate support ----
+
+    [Fact]
+    public void Geometry_PointWithM_IncludesMInCoordinates()
+    {
+        var pt = new GmlPoint { Coordinate = new GmlCoordinate(1, 2, 3, 4) };
+        var json = GeoJsonBuilder.Geometry(pt)!;
+
+        json["coordinates"]!.AsArray().Should().HaveCount(4);
+    }
+
+    [Fact]
+    public void Geometry_PointWithMButNoZ_PadsZeroZ()
+    {
+        var pt = new GmlPoint { Coordinate = new GmlCoordinate(1, 2, M: 5) };
+        var json = GeoJsonBuilder.Geometry(pt)!;
+
+        var coords = json["coordinates"]!.AsArray();
+        coords.Should().HaveCount(4); // x, y, 0 (padded Z), m
+        coords[2]!.GetValue<long>().Should().Be(0); // Z padded as integer 0
+        coords[3]!.GetValue<long>().Should().Be(5); // M=5.0 → integer 5
+    }
+
+    // ---- Negative coordinates ----
+
+    [Fact]
+    public void Geometry_NegativeCoords_FormatsCorrectly()
+    {
+        var pt = new GmlPoint { Coordinate = new GmlCoordinate(-122.4, -37.8) };
+        var jsonStr = GeoJsonBuilder.GeometryToJson(pt)!;
+
+        jsonStr.Should().Contain("-122.4");
+        jsonStr.Should().Contain("-37.8");
+    }
 }

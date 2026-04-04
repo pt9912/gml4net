@@ -184,6 +184,88 @@ public class WktBuilderTests
         WktBuilder.Geometry(mp).Should().StartWith("MULTIPOLYGON (((0 0,");
     }
 
+    // ---- Null guard ----
+
+    [Fact]
+    public void Geometry_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => WktBuilder.Geometry(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    // ---- EMPTY geometries ----
+
+    [Fact]
+    public void Geometry_EmptyLineString_ReturnsEmpty()
+    {
+        var ls = new GmlLineString { Coordinates = [] };
+        WktBuilder.Geometry(ls).Should().Be("LINESTRING EMPTY");
+    }
+
+    [Fact]
+    public void Geometry_EmptyCurve_ReturnsEmpty()
+    {
+        var c = new GmlCurve { Coordinates = [] };
+        WktBuilder.Geometry(c).Should().Be("LINESTRING EMPTY");
+    }
+
+    // ---- M-Coordinate support ----
+
+    [Fact]
+    public void Geometry_PointWithZM_ReturnsPointZM()
+    {
+        var pt = new GmlPoint { Coordinate = new GmlCoordinate(1, 2, 3, 4) };
+        WktBuilder.Geometry(pt).Should().Be("POINT ZM (1 2 3 4)");
+    }
+
+    [Fact]
+    public void Geometry_PointWithMOnly_ReturnsPointM()
+    {
+        var pt = new GmlPoint { Coordinate = new GmlCoordinate(1, 2, M: 5) };
+        WktBuilder.Geometry(pt).Should().Be("POINT M (1 2 5)");
+    }
+
+    // ---- 3D Polygon with interior ----
+
+    [Fact]
+    public void Geometry_PolygonWith3DInterior_UsesPolygonZ()
+    {
+        var poly = new GmlPolygon
+        {
+            Exterior = new GmlLinearRing { Coordinates = [new(0, 0), new(10, 0), new(10, 10), new(0, 0)] },
+            Interior = [new GmlLinearRing { Coordinates = [new(1, 1, 5), new(2, 1, 5), new(2, 2, 5), new(1, 1, 5)] }]
+        };
+        var wkt = WktBuilder.Geometry(poly)!;
+
+        wkt.Should().StartWith("POLYGON Z (");
+        // Exterior coords should have Z padded to 0
+        wkt.Should().Contain("0 0 0");
+    }
+
+    // ---- Negative coordinates ----
+
+    [Fact]
+    public void Geometry_NegativeCoords_FormatsCorrectly()
+    {
+        var pt = new GmlPoint { Coordinate = new GmlCoordinate(-122.4, -37.8) };
+        WktBuilder.Geometry(pt).Should().Be("POINT (-122.4 -37.8)");
+    }
+
+    // ---- Envelope with Z ----
+
+    [Fact]
+    public void Geometry_EnvelopeWith3D_ReturnsPolygonZ()
+    {
+        var env = new GmlEnvelope
+        {
+            LowerCorner = new GmlCoordinate(0, 0, 100),
+            UpperCorner = new GmlCoordinate(10, 10, 200)
+        };
+        var wkt = WktBuilder.Geometry(env)!;
+
+        wkt.Should().StartWith("POLYGON Z ((");
+    }
+
     // ---- Full roundtrip: GML XML → Parse → WKT ----
 
     [Fact]

@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using Gml4Net.Model;
 using Gml4Net.Model.Geometry;
 
@@ -25,8 +24,8 @@ public static class WktBuilder
             GmlLineString ls => BuildLineString(ls),
             GmlLinearRing lr => BuildLinearRing(lr),
             GmlPolygon poly => BuildPolygon(poly),
-            GmlEnvelope env => BuildEnvelope(env),
-            GmlBox box => BuildBox(box),
+            GmlEnvelope env => BuildBboxWkt(env.LowerCorner, env.UpperCorner),
+            GmlBox box => BuildBboxWkt(box.LowerCorner, box.UpperCorner),
             GmlCurve c => BuildCurve(c),
             GmlSurface s => BuildSurface(s),
             GmlMultiPoint mp => BuildMultiPoint(mp),
@@ -38,113 +37,111 @@ public static class WktBuilder
 
     // ---- Builders ----
 
-    /// <summary>Builds POINT (x y) or POINT Z (x y z).</summary>
-    private static string BuildPoint(GmlPoint p) =>
-        p.Coordinate.Z.HasValue
-            ? $"POINT Z ({FormatCoord3D(p.Coordinate)})"
-            : $"POINT ({FormatCoord(p.Coordinate)})";
+    /// <summary>Builds POINT, POINT Z, or POINT ZM.</summary>
+    private static string BuildPoint(GmlPoint p)
+    {
+        var c = p.Coordinate;
+        if (c.M.HasValue && c.Z.HasValue)
+            return $"POINT ZM ({FormatCoordZM(c)})";
+        if (c.M.HasValue)
+            return $"POINT M ({F(c.X)} {F(c.Y)} {F(c.M.Value)})";
+        if (c.Z.HasValue)
+            return $"POINT Z ({FormatCoord3D(c)})";
+        return $"POINT ({FormatCoord(c)})";
+    }
 
-    /// <summary>Builds LINESTRING (x y, x y, ...).</summary>
+    /// <summary>Builds LINESTRING or LINESTRING EMPTY.</summary>
     private static string BuildLineString(GmlLineString ls) =>
-        Has3D(ls.Coordinates)
-            ? $"LINESTRING Z ({FormatCoords3D(ls.Coordinates)})"
-            : $"LINESTRING ({FormatCoords(ls.Coordinates)})";
+        ls.Coordinates.Count == 0 ? "LINESTRING EMPTY" : WrapCoords("LINESTRING", ls.Coordinates);
 
-    /// <summary>Builds LINESTRING from LinearRing (same WKT output).</summary>
+    /// <summary>Builds LINESTRING from LinearRing.</summary>
     private static string BuildLinearRing(GmlLinearRing lr) =>
-        Has3D(lr.Coordinates)
-            ? $"LINESTRING Z ({FormatCoords3D(lr.Coordinates)})"
-            : $"LINESTRING ({FormatCoords(lr.Coordinates)})";
+        lr.Coordinates.Count == 0 ? "LINESTRING EMPTY" : WrapCoords("LINESTRING", lr.Coordinates);
 
-    /// <summary>Builds POLYGON ((x y, ...), (x y, ...)).</summary>
+    /// <summary>Builds POLYGON with exterior and interior rings.</summary>
     private static string BuildPolygon(GmlPolygon poly)
     {
-        var rings = new List<string> { $"({FormatRingCoords(poly.Exterior.Coordinates)})" };
-        foreach (var hole in poly.Interior)
-            rings.Add($"({FormatRingCoords(hole.Coordinates)})");
+        var allCoords = new List<IReadOnlyList<GmlCoordinate>> { poly.Exterior.Coordinates };
+        allCoords.AddRange(poly.Interior.Select(h => h.Coordinates));
 
-        var is3D = Has3D(poly.Exterior.Coordinates);
-        return is3D
-            ? $"POLYGON Z ({string.Join(", ", rings)})"
-            : $"POLYGON ({string.Join(", ", rings)})";
+        var is3D = allCoords.Any(Has3D);
+        var rings = allCoords.Select(r =>
+            $"({(is3D ? FormatCoords3D(r) : FormatCoords(r))})");
+
+        var tag = is3D ? "POLYGON Z" : "POLYGON";
+        return $"{tag} ({string.Join(", ", rings)})";
     }
 
-    /// <summary>Builds POLYGON rectangle from Envelope.</summary>
-    private static string BuildEnvelope(GmlEnvelope env)
+    /// <summary>Builds POLYGON rectangle from lower/upper corner, preserving Z.</summary>
+    private static string BuildBboxWkt(GmlCoordinate ll, GmlCoordinate ur)
     {
-        var ll = env.LowerCorner;
-        var ur = env.UpperCorner;
         var coords = new[]
         {
-            ll, new GmlCoordinate(ur.X, ll.Y), ur, new GmlCoordinate(ll.X, ur.Y), ll
+            ll, new GmlCoordinate(ur.X, ll.Y, ll.Z), ur, new GmlCoordinate(ll.X, ur.Y, ur.Z), ll
         };
-        return $"POLYGON (({FormatCoords(coords)}))";
-    }
-
-    /// <summary>Builds POLYGON rectangle from GML 2 Box.</summary>
-    private static string BuildBox(GmlBox box)
-    {
-        var ll = box.LowerCorner;
-        var ur = box.UpperCorner;
-        var coords = new[]
-        {
-            ll, new GmlCoordinate(ur.X, ll.Y), ur, new GmlCoordinate(ll.X, ur.Y), ll
-        };
-        return $"POLYGON (({FormatCoords(coords)}))";
+        var is3D = Has3D(coords);
+        var tag = is3D ? "POLYGON Z" : "POLYGON";
+        return $"{tag} (({(is3D ? FormatCoords3D(coords) : FormatCoords(coords))}))";
     }
 
     /// <summary>Builds LINESTRING from Curve (flattened segments).</summary>
     private static string BuildCurve(GmlCurve c) =>
-        Has3D(c.Coordinates)
-            ? $"LINESTRING Z ({FormatCoords3D(c.Coordinates)})"
-            : $"LINESTRING ({FormatCoords(c.Coordinates)})";
+        c.Coordinates.Count == 0 ? "LINESTRING EMPTY" : WrapCoords("LINESTRING", c.Coordinates);
 
     /// <summary>Builds MULTIPOLYGON from Surface (polygon patches).</summary>
     private static string BuildSurface(GmlSurface s)
     {
-        var polys = s.Patches.Select(p =>
-        {
-            var rings = new List<string> { $"({FormatRingCoords(p.Exterior.Coordinates)})" };
-            foreach (var hole in p.Interior)
-                rings.Add($"({FormatRingCoords(hole.Coordinates)})");
-            return $"({string.Join(", ", rings)})";
-        });
+        var polys = s.Patches.Select(FormatPolygonRings);
         return $"MULTIPOLYGON ({string.Join(", ", polys)})";
     }
 
-    /// <summary>Builds MULTIPOINT ((x y), (x y), ...).</summary>
+    /// <summary>Builds MULTIPOINT.</summary>
     private static string BuildMultiPoint(GmlMultiPoint mp)
     {
         var is3D = mp.Points.Any(p => p.Coordinate.Z.HasValue);
         var points = mp.Points.Select(p =>
             is3D ? $"({FormatCoord3D(p.Coordinate)})" : $"({FormatCoord(p.Coordinate)})");
-        return is3D
-            ? $"MULTIPOINT Z ({string.Join(", ", points)})"
-            : $"MULTIPOINT ({string.Join(", ", points)})";
+        var tag = is3D ? "MULTIPOINT Z" : "MULTIPOINT";
+        return $"{tag} ({string.Join(", ", points)})";
     }
 
-    /// <summary>Builds MULTILINESTRING ((x y, ...), ...).</summary>
+    /// <summary>Builds MULTILINESTRING.</summary>
     private static string BuildMultiLineString(GmlMultiLineString mls)
     {
         var is3D = mls.LineStrings.Any(ls => Has3D(ls.Coordinates));
         var lines = mls.LineStrings.Select(ls =>
             is3D ? $"({FormatCoords3D(ls.Coordinates)})" : $"({FormatCoords(ls.Coordinates)})");
-        return is3D
-            ? $"MULTILINESTRING Z ({string.Join(", ", lines)})"
-            : $"MULTILINESTRING ({string.Join(", ", lines)})";
+        var tag = is3D ? "MULTILINESTRING Z" : "MULTILINESTRING";
+        return $"{tag} ({string.Join(", ", lines)})";
     }
 
-    /// <summary>Builds MULTIPOLYGON (((x y, ...)), ...).</summary>
+    /// <summary>Builds MULTIPOLYGON.</summary>
     private static string BuildMultiPolygon(GmlMultiPolygon mpoly)
     {
-        var polys = mpoly.Polygons.Select(poly =>
-        {
-            var rings = new List<string> { $"({FormatRingCoords(poly.Exterior.Coordinates)})" };
-            foreach (var hole in poly.Interior)
-                rings.Add($"({FormatRingCoords(hole.Coordinates)})");
-            return $"({string.Join(", ", rings)})";
-        });
+        var polys = mpoly.Polygons.Select(FormatPolygonRings);
         return $"MULTIPOLYGON ({string.Join(", ", polys)})";
+    }
+
+    // ---- Shared helpers ----
+
+    /// <summary>Formats a polygon's exterior + interior rings as WKT ring list.</summary>
+    private static string FormatPolygonRings(GmlPolygon poly)
+    {
+        var allCoords = new List<IReadOnlyList<GmlCoordinate>> { poly.Exterior.Coordinates };
+        allCoords.AddRange(poly.Interior.Select(h => h.Coordinates));
+
+        var is3D = allCoords.Any(Has3D);
+        var rings = allCoords.Select(r =>
+            $"({(is3D ? FormatCoords3D(r) : FormatCoords(r))})");
+        return $"({string.Join(", ", rings)})";
+    }
+
+    /// <summary>Wraps coordinates with a WKT type tag, auto-detecting 3D.</summary>
+    private static string WrapCoords(string typeName, IReadOnlyList<GmlCoordinate> coords)
+    {
+        var is3D = Has3D(coords);
+        var tag = is3D ? $"{typeName} Z" : typeName;
+        return $"{tag} ({(is3D ? FormatCoords3D(coords) : FormatCoords(coords))})";
     }
 
     // ---- Formatting helpers ----
@@ -153,9 +150,13 @@ public static class WktBuilder
     private static string FormatCoord(GmlCoordinate c) =>
         $"{F(c.X)} {F(c.Y)}";
 
-    /// <summary>Formats a 3D coordinate as "x y z".</summary>
+    /// <summary>Formats a 3D coordinate as "x y z" (pads Z=0 if missing).</summary>
     private static string FormatCoord3D(GmlCoordinate c) =>
-        c.Z.HasValue ? $"{F(c.X)} {F(c.Y)} {F(c.Z.Value)}" : $"{F(c.X)} {F(c.Y)}";
+        $"{F(c.X)} {F(c.Y)} {F(c.Z ?? 0)}";
+
+    /// <summary>Formats a 4D coordinate as "x y z m".</summary>
+    private static string FormatCoordZM(GmlCoordinate c) =>
+        $"{F(c.X)} {F(c.Y)} {F(c.Z ?? 0)} {F(c.M ?? 0)}";
 
     /// <summary>Formats a list of 2D coordinates as comma-separated pairs.</summary>
     private static string FormatCoords(IEnumerable<GmlCoordinate> coords) =>
@@ -164,10 +165,6 @@ public static class WktBuilder
     /// <summary>Formats a list of 3D coordinates as comma-separated triples.</summary>
     private static string FormatCoords3D(IEnumerable<GmlCoordinate> coords) =>
         string.Join(", ", coords.Select(FormatCoord3D));
-
-    /// <summary>Formats ring coordinates, choosing 2D or 3D based on content.</summary>
-    private static string FormatRingCoords(IReadOnlyList<GmlCoordinate> coords) =>
-        Has3D(coords) ? FormatCoords3D(coords) : FormatCoords(coords);
 
     /// <summary>Returns true if any coordinate in the list has a Z component.</summary>
     private static bool Has3D(IReadOnlyList<GmlCoordinate> coords) =>
