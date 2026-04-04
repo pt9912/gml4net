@@ -1,6 +1,6 @@
 # Gml4Net: Roadmap
 
-Aktueller Stand: Phase 3 abgeschlossen. Phase 4 (Interop: GeoJSON + WKT) ist als naechstes geplant.
+Aktueller Stand: Phase 4 abgeschlossen. Phase 5 (OWS + WCS) ist als naechstes geplant.
 
 ## Uebersicht
 
@@ -207,35 +207,36 @@ Geometrie  Parser     Parser +   GeoJSON    WCS        + I/O      Builder
 
 ## Phase 4: Interop (GeoJSON + WKT)
 
-**Status:** Offen
+**Status:** Abgeschlossen
 **Voraussetzung:** Phase 2 (Features fuer GeoJSON)
 **Ziel:** GML-Daten in gaengige Austauschformate konvertieren
 
 ### Aufgaben
 
-- [ ] `GeoJsonBuilder`:
-  - [ ] `Geometry()` → `JsonObject` fuer alle Geometrie-Typen:
+- [x] `GeoJsonBuilder`:
+  - [x] `Geometry()` → `JsonObject` fuer alle Geometrie-Typen:
     - Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon
     - Envelope/Box → Polygon-Rechteck
     - Curve → LineString (abgeflacht)
     - Surface → MultiPolygon (Patches)
-  - [ ] `Feature()` → GeoJSON Feature mit Properties
-  - [ ] `FeatureCollection()` → GeoJSON FeatureCollection
-  - [ ] `Document()` → Auto-Dispatch
-  - [ ] String-Varianten: `GeometryToJson()`, `FeatureToJson()`, etc.
-  - [ ] Property-Konvertierung:
-    - String/Numeric → JSON-Werte
+  - [x] `Feature()` → GeoJSON Feature mit Properties
+  - [x] `FeatureCollection()` → GeoJSON FeatureCollection
+  - [x] `Document()` → Auto-Dispatch
+  - [x] String-Varianten: `GeometryToJson()`, `FeatureToJson()`, `FeatureCollectionToJson()`
+  - [x] Property-Konvertierung:
+    - String/Numeric → JSON-Werte (Integers als long, Floats als double)
     - Geometry → geometry-Feld
     - Nested → verschachteltes JSON-Objekt
     - RawXml → String-Wert
-- [ ] `WktBuilder`:
-  - [ ] `Geometry()` → WKT-String fuer alle Geometrie-Typen
-  - [ ] 2D und 3D Koordinaten-Ausgabe
-  - [ ] Formate: POINT, LINESTRING, POLYGON, MULTI*
-- [ ] Tests:
-  - [ ] `GeoJsonBuilderTests` -- alle Geometrien, Features, FeatureCollections
-  - [ ] `WktBuilderTests` -- alle Geometrien, Dimensionen
-  - [ ] Roundtrip-Validierung: Parse → GeoJSON → JSON-String valide
+- [x] `WktBuilder`:
+  - [x] `Geometry()` → WKT-String fuer alle Geometrie-Typen
+  - [x] 2D und 3D Koordinaten-Ausgabe (POINT Z, LINESTRING Z, etc.)
+  - [x] Formate: POINT, LINESTRING, POLYGON, MULTIPOINT, MULTILINESTRING, MULTIPOLYGON
+- [x] Tests (40 neue Tests):
+  - [x] `GeoJsonBuilderTests` -- alle Geometrien, Features, FeatureCollections,
+        Nested/RawXml Properties, Document dispatch, String-Varianten, Roundtrip
+  - [x] `WktBuilderTests` -- alle Geometrien, 2D + 3D, Roundtrip
+  - [x] Roundtrip-Validierung: GML XML → Parse → GeoJSON/WKT
 
 **Portierungsquellen:**
 - `gml4dart/lib/src/interop/geojson_builder.dart`
@@ -417,7 +418,7 @@ Jede Phase gilt als abgeschlossen, wenn:
 | **MVP** | Phase 1 | Geometrie-Parsing funktioniert, Modell steht -- **erreicht** |
 | **WFS-Ready** | Phase 2 | FeatureCollections aus WFS-Antworten parsbar -- **erreicht** |
 | **Coverage-Ready** | Phase 3 | OGC Coverages parsbar und erzeugbar -- **erreicht** |
-| **Interop-Ready** | Phase 4 | GeoJSON + WKT Export |
+| **Interop-Ready** | Phase 4 | GeoJSON + WKT Export -- **erreicht** |
 | **OGC-komplett** | Phase 5 | OWS + WCS Integration |
 | **Production-Ready** | Phase 6 | Streaming + I/O, grosse Dokumente |
 | **Feature-komplett** | Phase 7 | Alle Builder, Feature-Paritaet mit s-gml |
