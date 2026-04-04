@@ -7,6 +7,7 @@ namespace Gml4Net.Generators;
 
 /// <summary>
 /// Generates GML 3.2 / gmlcov XML from coverage model objects.
+/// The output always uses the <c>gmlcov:</c> namespace for the root element.
 /// </summary>
 public static class CoverageGenerator
 {
@@ -15,8 +16,11 @@ public static class CoverageGenerator
     private static readonly XNamespace Swe = GmlNamespaces.Swe;
 
     /// <summary>
-    /// Generates GML 3.2 / gmlcov XML string from a coverage model.
+    /// Generates a GML 3.2 / gmlcov XML string from a coverage model.
     /// </summary>
+    /// <param name="coverage">The coverage model to serialize.</param>
+    /// <param name="prettyPrint">Whether to indent the output XML (default true).</param>
+    /// <returns>The coverage as a GML/gmlcov XML string.</returns>
     public static string Generate(GmlCoverage coverage, bool prettyPrint = true)
     {
         ArgumentNullException.ThrowIfNull(coverage);

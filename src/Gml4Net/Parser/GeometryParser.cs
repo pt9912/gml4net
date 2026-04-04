@@ -516,21 +516,23 @@ internal static class GeometryParser
                 Version = version
             };
 
-        // Heterogeneous: flatten into the broadest multi type possible
-        // Points + LineStrings → MultiLineString (points dropped with warning)
-        // Mixed with polygons → MultiPolygon (non-polygons dropped with warning)
+        // Heterogeneous: keep only geometries matching the dominant (most frequent) type
+        var dominantType = geometries.GroupBy(g => g.GetType())
+            .OrderByDescending(g => g.Count())
+            .First();
+
         issues.Add(new GmlParseIssue
         {
             Severity = GmlIssueSeverity.Warning,
             Code = "heterogeneous_multi_geometry",
             Message = $"MultiGeometry contains {geometries.Count} mixed geometry types; " +
-                      "only the first type is preserved",
+                      $"keeping {dominantType.Count()} {dominantType.Key.Name} elements, " +
+                      $"dropping {geometries.Count - dominantType.Count()} others",
             Location = "MultiGeometry"
         });
 
-        // Group by first type and return the largest homogeneous group
-        var firstType = geometries[0].GetType();
-        var sameType = geometries.Where(g => g.GetType() == firstType).ToList();
+        var firstType = dominantType.Key;
+        var sameType = dominantType.ToList();
 
         if (firstType == typeof(GmlPoint))
             return new GmlMultiPoint { Points = sameType.Cast<GmlPoint>().ToList(), SrsName = srsName, Version = version };

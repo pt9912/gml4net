@@ -204,5 +204,4 @@ internal static class FeatureParser
 
         return nonGmlChild ?? memberElement.Elements().FirstOrDefault();
     }
-
 }

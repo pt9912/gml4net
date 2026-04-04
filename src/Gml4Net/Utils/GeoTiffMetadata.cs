@@ -14,19 +14,19 @@ public sealed class GeoTiffMetadata
     public int Height { get; init; }
 
     /// <summary>Bounding box [minX, minY, maxX, maxY].</summary>
-    public double[]? Bbox { get; init; }
+    public IReadOnlyList<double>? Bbox { get; init; }
 
     /// <summary>Coordinate reference system identifier.</summary>
     public string? Crs { get; init; }
 
     /// <summary>Affine transform coefficients [a, b, c, d, e, f].</summary>
-    public double[]? Transform { get; init; }
+    public IReadOnlyList<double>? Transform { get; init; }
 
     /// <summary>Pixel resolution [resX, resY].</summary>
-    public double[]? Resolution { get; init; }
+    public IReadOnlyList<double>? Resolution { get; init; }
 
     /// <summary>Grid origin [x, y].</summary>
-    public double[]? Origin { get; init; }
+    public IReadOnlyList<double>? Origin { get; init; }
 
     /// <summary>Number of bands.</summary>
     public int? Bands { get; init; }
@@ -43,8 +43,10 @@ public static class GeoTiffUtils
 {
     /// <summary>
     /// Extracts raster metadata from a GML coverage.
-    /// Returns null if the coverage does not contain sufficient grid information.
+    /// Only <see cref="GmlRectifiedGridCoverage"/> contains sufficient grid information.
     /// </summary>
+    /// <param name="coverage">The coverage to extract metadata from.</param>
+    /// <returns>Metadata if the coverage is a rectified grid coverage; otherwise null.</returns>
     public static GeoTiffMetadata? ExtractMetadata(GmlCoverage coverage)
     {
         ArgumentNullException.ThrowIfNull(coverage);
@@ -62,8 +64,8 @@ public static class GeoTiffUtils
             ? limits.High[1] - limits.Low[1] + 1
             : 0;
 
-        double[]? transform = null;
-        double[]? resolution = null;
+        IReadOnlyList<double>? transform = null;
+        IReadOnlyList<double>? resolution = null;
 
         if (grid.OffsetVectors.Count >= 2
             && grid.OffsetVectors[0].Count >= 2
@@ -76,14 +78,14 @@ public static class GeoTiffUtils
             double c = grid.Origin.X;             // x-origin
             double f = grid.Origin.Y;             // y-origin
 
-            transform = [a, b, c, d, e, f];
-            resolution = [Math.Abs(a), Math.Abs(e)];
+            transform = (double[])[a, b, c, d, e, f];
+            resolution = (double[])[Math.Abs(a), Math.Abs(e)];
         }
 
-        double[]? bbox = null;
+        IReadOnlyList<double>? bbox = null;
         if (rgc.BoundedBy is not null)
         {
-            bbox =
+            bbox = (double[])
             [
                 rgc.BoundedBy.LowerCorner.X,
                 rgc.BoundedBy.LowerCorner.Y,
@@ -99,7 +101,7 @@ public static class GeoTiffUtils
             Crs = grid.SrsName,
             Transform = transform,
             Resolution = resolution,
-            Origin = [grid.Origin.X, grid.Origin.Y],
+            Origin = (double[])[grid.Origin.X, grid.Origin.Y],
             Bbox = bbox,
             Bands = rgc.RangeType?.Fields.Count,
             BandInfo = rgc.RangeType?.Fields
@@ -109,11 +111,15 @@ public static class GeoTiffUtils
     /// <summary>
     /// Converts pixel coordinates to world coordinates using the affine transform.
     /// </summary>
+    /// <param name="col">Pixel column (x).</param>
+    /// <param name="row">Pixel row (y).</param>
+    /// <param name="metadata">Metadata containing the affine transform.</param>
+    /// <returns>World coordinates, or null if no valid transform is available.</returns>
     public static (double X, double Y)? PixelToWorld(double col, double row, GeoTiffMetadata metadata)
     {
         ArgumentNullException.ThrowIfNull(metadata);
 
-        if (metadata.Transform is not { Length: 6 })
+        if (metadata.Transform is not { Count: 6 })
             return null;
 
         var t = metadata.Transform;
@@ -125,11 +131,15 @@ public static class GeoTiffUtils
     /// <summary>
     /// Converts world coordinates to pixel coordinates using the inverse affine transform.
     /// </summary>
+    /// <param name="x">World X coordinate.</param>
+    /// <param name="y">World Y coordinate.</param>
+    /// <param name="metadata">Metadata containing the affine transform.</param>
+    /// <returns>Pixel coordinates, or null if no valid/invertible transform is available.</returns>
     public static (double Col, double Row)? WorldToPixel(double x, double y, GeoTiffMetadata metadata)
     {
         ArgumentNullException.ThrowIfNull(metadata);
 
-        if (metadata.Transform is not { Length: 6 })
+        if (metadata.Transform is not { Count: 6 })
             return null;
 
         var t = metadata.Transform;

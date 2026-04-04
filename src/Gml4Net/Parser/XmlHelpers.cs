@@ -9,6 +9,8 @@ namespace Gml4Net.Parser;
 /// </summary>
 internal static class XmlHelpers
 {
+    private static readonly char[] WhitespaceSeparators = [' ', '\t', '\n', '\r'];
+
     /// <summary>
     /// Returns true if the namespace URI is a known GML namespace.
     /// </summary>
@@ -136,7 +138,7 @@ internal static class XmlHelpers
     /// </summary>
     internal static GmlCoordinate ParsePos(string text, int? srsDimension = null, List<GmlParseIssue>? issues = null)
     {
-        var parts = text.Trim().Split((char[])[' ', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+        var parts = text.Trim().Split(WhitespaceSeparators, StringSplitOptions.RemoveEmptyEntries);
 
         if (parts.Length < 2)
             return new GmlCoordinate(0, 0);
@@ -171,7 +173,7 @@ internal static class XmlHelpers
         if (string.IsNullOrEmpty(text))
             return [];
 
-        var parts = text.Split((char[])[' ', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+        var parts = text.Split(WhitespaceSeparators, StringSplitOptions.RemoveEmptyEntries);
         var values = new List<double>(parts.Length);
         foreach (var part in parts)
         {
@@ -216,7 +218,7 @@ internal static class XmlHelpers
         if (string.IsNullOrEmpty(text))
             return [];
 
-        var tuples = text.Split((char[])[' ', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+        var tuples = text.Split(WhitespaceSeparators, StringSplitOptions.RemoveEmptyEntries);
         var coords = new List<GmlCoordinate>(tuples.Length);
 
         foreach (var tuple in tuples)

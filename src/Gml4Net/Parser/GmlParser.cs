@@ -13,6 +13,8 @@ public static class GmlParser
     /// <summary>
     /// Parses a GML XML string into a <see cref="GmlParseResult"/>.
     /// </summary>
+    /// <param name="xml">The GML XML string to parse.</param>
+    /// <returns>A result containing the parsed document and any diagnostic issues.</returns>
     public static GmlParseResult ParseXmlString(string xml)
     {
         ArgumentNullException.ThrowIfNull(xml);
@@ -42,6 +44,8 @@ public static class GmlParser
     /// Parses a GML document from a byte span.
     /// Uses XDocument.Load to respect the XML encoding declaration.
     /// </summary>
+    /// <param name="bytes">The raw bytes of the GML XML document.</param>
+    /// <returns>A result containing the parsed document and any diagnostic issues.</returns>
     public static GmlParseResult ParseBytes(ReadOnlySpan<byte> bytes)
     {
         var issues = new List<GmlParseIssue>();
@@ -70,6 +74,8 @@ public static class GmlParser
     /// <summary>
     /// Parses a GML document from a stream.
     /// </summary>
+    /// <param name="stream">A stream containing the GML XML document.</param>
+    /// <returns>A result containing the parsed document and any diagnostic issues.</returns>
     public static GmlParseResult ParseStream(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
