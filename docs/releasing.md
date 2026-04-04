@@ -1,0 +1,133 @@
+# Releasing
+
+## Pakete
+
+| Paket | Beschreibung | Workflow |
+|---|---|---|
+| `Gml4Net` | Core-Bibliothek: Parser, Modell, Interop, OWS, WCS | `publish-gml4net.yml` |
+| `Gml4Net.IO` | Optionales I/O-Paket: File, HTTP, Streaming | `publish-gml4net-io.yml` |
+
+Beide Pakete werden auf [nuget.org](https://www.nuget.org/) veroeffentlicht.
+
+## Voraussetzungen
+
+- `NUGET_API_KEY` muss als Repository-Secret in den GitHub-Settings hinterlegt sein
+  (Settings → Secrets and variables → Actions → Repository secrets)
+- Das Secret muss in der GitHub Environment `nuget` verfuegbar sein
+  (Settings → Environments → nuget)
+- Der Key muss Berechtigungen fuer `Gml4Net` und `Gml4Net.IO` auf nuget.org haben
+
+## Release per Git-Tag
+
+Die Publish-Workflows werden automatisch ausgeloest wenn ein Tag mit dem
+passenden Praefix gepusht wird.
+
+### Beide Pakete mit derselben Version releasen
+
+```bash
+# Sicherstellen dass main aktuell ist
+git checkout main
+git pull
+
+# Tags erstellen
+git tag Gml4Net-v0.1.0
+git tag Gml4Net.IO-v0.1.0
+
+# Tags pushen (loest beide Workflows aus)
+git push origin Gml4Net-v0.1.0 Gml4Net.IO-v0.1.0
+```
+
+### Einzelnes Paket releasen
+
+```bash
+# Nur Core
+git tag Gml4Net-v0.2.0
+git push origin Gml4Net-v0.2.0
+
+# Nur I/O
+git tag Gml4Net.IO-v0.2.0
+git push origin Gml4Net.IO-v0.2.0
+```
+
+### Tag-Format
+
+| Paket | Tag-Muster | Beispiele |
+|---|---|---|
+| `Gml4Net` | `Gml4Net-v<semver>` | `Gml4Net-v0.1.0`, `Gml4Net-v1.0.0`, `Gml4Net-v2.0.0-rc.1` |
+| `Gml4Net.IO` | `Gml4Net.IO-v<semver>` | `Gml4Net.IO-v0.1.0`, `Gml4Net.IO-v1.0.0` |
+
+Die Version muss gueltigem SemVer entsprechen (`major.minor.patch` mit
+optionalem Pre-Release-Suffix).
+
+## Release per workflow_dispatch
+
+Alternativ kann ein Release manuell ueber die GitHub Actions UI ausgeloest
+werden, ohne einen Tag zu erstellen:
+
+1. GitHub → Actions → "Publish Gml4Net" (oder "Publish Gml4Net.IO")
+2. "Run workflow" klicken
+3. Version eingeben (z.B. `0.1.0`)
+4. "Run workflow" bestaetigen
+
+Dies ist nuetzlich fuer Testveroeffentlichungen oder wenn kein Tag
+erwuenscht ist.
+
+## Was der Workflow macht
+
+Jeder Publish-Workflow fuehrt folgende Schritte aus:
+
+1. **Checkout** -- Repository auschecken
+2. **Version ermitteln** -- aus dem Tag-Namen oder dem `workflow_dispatch`-Input
+3. **Test** -- `docker buildx build --target test` (vollstaendiger Testlauf mit Coverage-Gate)
+4. **Pack** -- `docker buildx build --target artifacts` mit `PACK_TARGET` und `PACKAGE_VERSION`
+5. **Upload** -- `.nupkg`-Datei als GitHub Actions Artifact sichern
+6. **Push** -- `docker buildx build --target push` mit `NUGET_API_KEY` als BuildKit-Secret
+
+Der Push verwendet `--skip-duplicate`, sodass ein erneutes Ausloesen mit
+derselben Version keinen Fehler erzeugt.
+
+## Versionierung
+
+Das Projekt folgt [Semantic Versioning](https://semver.org/):
+
+- **0.x.y** -- Initiale Entwicklung, API kann sich aendern
+- **1.0.0** -- Erste stabile API
+- **Major** -- Breaking Changes
+- **Minor** -- Neue Features, abwaertskompatibel
+- **Patch** -- Bugfixes, abwaertskompatibel
+
+`Gml4Net` und `Gml4Net.IO` koennen unterschiedliche Versionen haben.
+`Gml4Net.IO` referenziert `Gml4Net` als Projektabhaengigkeit -- beim
+Release wird die zur Buildzeit aktuelle Version des Core-Pakets verwendet.
+
+## Lokales Testen des Pack-Schritts
+
+```bash
+# Beide Pakete bauen
+docker buildx build --target pack \
+  --build-arg PACKAGE_VERSION=0.1.0 \
+  -o type=local,dest=./artifacts .
+
+# Nur Core-Paket bauen
+docker buildx build --target pack \
+  --build-arg PACK_TARGET=src/Gml4Net/Gml4Net.csproj \
+  --build-arg PACKAGE_VERSION=0.1.0 \
+  -o type=local,dest=./artifacts .
+
+# Nur I/O-Paket bauen
+docker buildx build --target pack \
+  --build-arg PACK_TARGET=src/Gml4Net.IO/Gml4Net.IO.csproj \
+  --build-arg PACKAGE_VERSION=0.1.0 \
+  -o type=local,dest=./artifacts .
+```
+
+Die `.nupkg`-Dateien landen im `./artifacts/`-Verzeichnis.
+
+## Checkliste vor einem Release
+
+- [ ] Alle Tests gruen (`docker buildx build --target test .`)
+- [ ] CHANGELOG.md aktualisiert (Unreleased → Versionsnummer + Datum)
+- [ ] README.md Statusabschnitt aktuell
+- [ ] Keine uncommitteten Aenderungen (`git status`)
+- [ ] Main-Branch ist aktuell (`git pull`)
+- [ ] Version noch nicht auf nuget.org vorhanden
