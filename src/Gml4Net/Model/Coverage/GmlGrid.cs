@@ -5,6 +5,8 @@ namespace Gml4Net.Model.Coverage;
 /// </summary>
 public class GmlGrid
 {
+    internal GmlGrid() { }
+
     /// <summary>Number of dimensions.</summary>
     public required int Dimension { get; init; }
 

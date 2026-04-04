@@ -15,6 +15,7 @@ public static class GmlParser
     /// </summary>
     public static GmlParseResult ParseXmlString(string xml)
     {
+        ArgumentNullException.ThrowIfNull(xml);
         var issues = new List<GmlParseIssue>();
 
         XDocument doc;
@@ -39,11 +40,31 @@ public static class GmlParser
 
     /// <summary>
     /// Parses a GML document from a byte span.
+    /// Uses XDocument.Load to respect the XML encoding declaration.
     /// </summary>
     public static GmlParseResult ParseBytes(ReadOnlySpan<byte> bytes)
     {
-        var xml = System.Text.Encoding.UTF8.GetString(bytes);
-        return ParseXmlString(xml);
+        var issues = new List<GmlParseIssue>();
+        using var stream = new MemoryStream(bytes.ToArray());
+
+        XDocument doc;
+        try
+        {
+            doc = XDocument.Load(stream);
+        }
+        catch (System.Xml.XmlException ex)
+        {
+            issues.Add(new GmlParseIssue
+            {
+                Severity = GmlIssueSeverity.Error,
+                Code = "invalid_xml",
+                Message = $"Invalid XML: {ex.Message}",
+                Location = ex.LineNumber > 0 ? $"Line {ex.LineNumber}, Position {ex.LinePosition}" : null
+            });
+            return new GmlParseResult { Issues = issues };
+        }
+
+        return ParseDocument(doc, issues);
     }
 
     /// <summary>
@@ -51,6 +72,7 @@ public static class GmlParser
     /// </summary>
     public static GmlParseResult ParseStream(Stream stream)
     {
+        ArgumentNullException.ThrowIfNull(stream);
         var issues = new List<GmlParseIssue>();
 
         XDocument doc;
@@ -90,7 +112,7 @@ public static class GmlParser
         var version = XmlHelpers.DetectVersion(doc);
         var rootContent = DispatchRoot(root, version, issues);
 
-        if (rootContent is null)
+        if (rootContent is null && !issues.Any(i => i.Severity == GmlIssueSeverity.Error))
         {
             issues.Add(new GmlParseIssue
             {
@@ -99,34 +121,38 @@ public static class GmlParser
                 Message = $"Unrecognized root element: {root.Name.LocalName} ({root.Name.NamespaceName})",
                 Location = root.Name.LocalName
             });
-            return new GmlParseResult { Issues = issues };
         }
 
-        // Extract boundedBy if present
-        var boundedByEl = XmlHelpers.FindGmlChild(root, "boundedBy");
+        if (rootContent is null)
+            return new GmlParseResult { Issues = issues };
+
+        // Extract boundedBy if present (skip for FeatureCollection — it handles its own)
         GmlEnvelope? boundedBy = null;
-        if (boundedByEl is not null)
+        if (rootContent is not GmlFeatureCollection)
         {
-            var envEl = XmlHelpers.FindGmlChild(boundedByEl, "Envelope");
-            if (envEl is not null)
+            var boundedByEl = XmlHelpers.FindGmlChild(root, "boundedBy");
+            if (boundedByEl is not null)
             {
-                boundedBy = GeometryParser.Parse(envEl, version, issues) as GmlEnvelope;
-            }
-            else
-            {
-                // GML 2: Box inside boundedBy
-                var boxEl = XmlHelpers.FindGmlChild(boundedByEl, "Box");
-                if (boxEl is not null)
+                var envEl = XmlHelpers.FindGmlChild(boundedByEl, "Envelope");
+                if (envEl is not null)
                 {
-                    var box = GeometryParser.Parse(boxEl, version, issues) as GmlBox;
-                    if (box is not null)
+                    boundedBy = GeometryParser.Parse(envEl, version, issues) as GmlEnvelope;
+                }
+                else
+                {
+                    var boxEl = XmlHelpers.FindGmlChild(boundedByEl, "Box");
+                    if (boxEl is not null)
                     {
-                        boundedBy = new GmlEnvelope
+                        var box = GeometryParser.Parse(boxEl, version, issues) as GmlBox;
+                        if (box is not null)
                         {
-                            LowerCorner = box.LowerCorner,
-                            UpperCorner = box.UpperCorner,
-                            SrsName = box.SrsName
-                        };
+                            boundedBy = new GmlEnvelope
+                            {
+                                LowerCorner = box.LowerCorner,
+                                UpperCorner = box.UpperCorner,
+                                SrsName = box.SrsName
+                            };
+                        }
                     }
                 }
             }
@@ -148,46 +174,60 @@ public static class GmlParser
         var localName = root.Name.LocalName;
 
         // Geometry types
-        if (XmlHelpers.IsGmlNamespace(ns) && IsGeometryElement(localName))
+        if (XmlHelpers.IsGmlNamespace(ns) && XmlHelpers.IsGeometryElement(localName))
         {
             return GeometryParser.Parse(root, version, issues);
         }
 
-        // FeatureCollection (GML or WFS root)
-        if (localName == "FeatureCollection")
+        // FeatureCollection (GML or WFS namespace only)
+        if ((XmlHelpers.IsGmlNamespace(ns) || XmlHelpers.IsWfsNamespace(ns))
+            && localName == "FeatureCollection")
         {
             return FeatureParser.ParseCollection(root, version, issues);
         }
 
-        // Single feature: non-GML/WFS root with properties
-        // Heuristic: if root is not in a GML/WFS namespace and has child elements,
-        // treat it as a standalone feature
-        if (!XmlHelpers.IsGmlNamespace(ns) && !XmlHelpers.IsWfsNamespace(ns)
-            && root.HasElements && !IsCoverageElement(localName))
-        {
-            return FeatureParser.ParseFeature(root, version, issues);
-        }
-
         // Coverage types — will be handled in Phase 3
-        if (IsCoverageElement(localName))
+        if ((XmlHelpers.IsGmlNamespace(ns) || ns == GmlNamespaces.Gmlcov) && IsCoverageElement(localName))
         {
             issues.Add(new GmlParseIssue
             {
-                Severity = GmlIssueSeverity.Info,
+                Severity = GmlIssueSeverity.Error,
                 Code = "coverage_not_implemented",
-                Message = "Coverage parsing is not yet implemented"
+                Message = $"Coverage parsing is not yet implemented: {localName}"
             });
             return null;
+        }
+
+        // Single feature: non-GML/WFS root that looks like a feature
+        // Requires gml:id or fid attribute, or contains a GML geometry child
+        if (!XmlHelpers.IsGmlNamespace(ns) && !XmlHelpers.IsWfsNamespace(ns)
+            && root.HasElements && LooksLikeFeature(root))
+        {
+            return FeatureParser.ParseFeature(root, version, issues);
         }
 
         return null;
     }
 
-    private static bool IsGeometryElement(string localName) => localName is
-        "Point" or "LineString" or "LinearRing" or "Polygon" or
-        "Envelope" or "Box" or "Curve" or "Surface" or
-        "MultiPoint" or "MultiLineString" or "MultiPolygon" or
-        "MultiCurve" or "MultiSurface" or "MultiGeometry";
+    private static bool LooksLikeFeature(XElement element)
+    {
+        // Has a feature ID attribute
+        if (XmlHelpers.GetFeatureId(element) is not null)
+            return true;
+
+        // Contains at least one child with a GML geometry grandchild
+        foreach (var child in element.Elements())
+        {
+            foreach (var grandchild in child.Elements())
+            {
+                if (XmlHelpers.IsGmlNamespace(grandchild.Name.NamespaceName)
+                    && XmlHelpers.IsGeometryElement(grandchild.Name.LocalName))
+                    return true;
+            }
+        }
+
+        return false;
+    }
 
     private static bool IsCoverageElement(string localName) => localName is
         "RectifiedGridCoverage" or "GridCoverage" or

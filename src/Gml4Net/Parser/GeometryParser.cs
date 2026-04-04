@@ -15,7 +15,6 @@ internal static class GeometryParser
     internal static GmlGeometry? Parse(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var localName = element.Name.LocalName;
-        var srsName = XmlHelpers.GetSrsName(element);
 
         GmlGeometry? result = localName switch
         {
@@ -23,8 +22,8 @@ internal static class GeometryParser
             "LineString" => ParseLineString(element, version, issues),
             "LinearRing" => ParseLinearRing(element, version, issues),
             "Polygon" => ParsePolygon(element, version, issues),
-            "Envelope" => ParseEnvelope(element, issues),
-            "Box" => ParseBox(element, issues),
+            "Envelope" => ParseEnvelope(element, version, issues),
+            "Box" => ParseBox(element, version, issues),
             "Curve" => ParseCurve(element, version, issues),
             "Surface" => ParseSurface(element, version, issues),
             "MultiPoint" => ParseMultiPoint(element, version, issues),
@@ -36,12 +35,7 @@ internal static class GeometryParser
             _ => null
         };
 
-        if (result is not null)
-        {
-            // Set common properties via init — we need to create new instances
-            // Since we can't set init properties after construction, we set them in each Parse method
-        }
-        else if (XmlHelpers.IsGmlNamespace(element.Name.NamespaceName))
+        if (result is null && XmlHelpers.IsGmlNamespace(element.Name.NamespaceName))
         {
             issues.Add(new GmlParseIssue
             {
@@ -64,7 +58,7 @@ internal static class GeometryParser
         var posEl = XmlHelpers.FindGmlChild(element, "pos");
         if (posEl is not null)
         {
-            var coord = XmlHelpers.ParsePos(posEl.Value, srsDim);
+            var coord = XmlHelpers.ParsePos(posEl.Value, srsDim, issues);
             return new GmlPoint { Coordinate = coord, SrsName = srsName, Version = version };
         }
 
@@ -72,7 +66,7 @@ internal static class GeometryParser
         var coordsEl = XmlHelpers.FindGmlChild(element, "coordinates");
         if (coordsEl is not null)
         {
-            var coords = XmlHelpers.ParseGml2Coordinates(coordsEl.Value);
+            var coords = XmlHelpers.ParseGml2Coordinates(coordsEl.Value, issues);
             if (coords.Count > 0)
                 return new GmlPoint { Coordinate = coords[0], SrsName = srsName, Version = version };
         }
@@ -81,7 +75,7 @@ internal static class GeometryParser
         var coordEl = XmlHelpers.FindGmlChild(element, "coord");
         if (coordEl is not null)
         {
-            var coord = ParseCoordElement(coordEl);
+            var coord = ParseCoordElement(coordEl, issues);
             return new GmlPoint { Coordinate = coord, SrsName = srsName, Version = version };
         }
 
@@ -197,7 +191,7 @@ internal static class GeometryParser
         };
     }
 
-    private static GmlEnvelope? ParseEnvelope(XElement element, List<GmlParseIssue> issues)
+    private static GmlEnvelope? ParseEnvelope(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
         var srsDim = XmlHelpers.GetSrsDimension(element);
@@ -219,27 +213,29 @@ internal static class GeometryParser
 
         return new GmlEnvelope
         {
-            LowerCorner = XmlHelpers.ParsePos(lowerEl.Value, srsDim),
-            UpperCorner = XmlHelpers.ParsePos(upperEl.Value, srsDim),
-            SrsName = srsName
+            LowerCorner = XmlHelpers.ParsePos(lowerEl.Value, srsDim, issues),
+            UpperCorner = XmlHelpers.ParsePos(upperEl.Value, srsDim, issues),
+            SrsName = srsName,
+            Version = version
         };
     }
 
-    private static GmlBox? ParseBox(XElement element, List<GmlParseIssue> issues)
+    private static GmlBox? ParseBox(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
 
         var coordsEl = XmlHelpers.FindGmlChild(element, "coordinates");
         if (coordsEl is not null)
         {
-            var coords = XmlHelpers.ParseGml2Coordinates(coordsEl.Value);
+            var coords = XmlHelpers.ParseGml2Coordinates(coordsEl.Value, issues);
             if (coords.Count >= 2)
             {
                 return new GmlBox
                 {
                     LowerCorner = coords[0],
                     UpperCorner = coords[1],
-                    SrsName = srsName
+                    SrsName = srsName,
+                    Version = version
                 };
             }
         }
@@ -250,9 +246,10 @@ internal static class GeometryParser
         {
             return new GmlBox
             {
-                LowerCorner = ParseCoordElement(coordEls[0]),
-                UpperCorner = ParseCoordElement(coordEls[1]),
-                SrsName = srsName
+                LowerCorner = ParseCoordElement(coordEls[0], issues),
+                UpperCorner = ParseCoordElement(coordEls[1], issues),
+                SrsName = srsName,
+                Version = version
             };
         }
 
@@ -336,7 +333,6 @@ internal static class GeometryParser
         var srsName = XmlHelpers.GetSrsName(element);
         var points = new List<GmlPoint>();
 
-        // <pointMember><Point>...</Point></pointMember>
         foreach (var memberEl in XmlHelpers.FindGmlChildren(element, "pointMember"))
         {
             var pointEl = XmlHelpers.FindGmlChild(memberEl, "Point");
@@ -348,7 +344,6 @@ internal static class GeometryParser
             }
         }
 
-        // <pointMembers><Point/>...</pointMembers>
         var membersEl = XmlHelpers.FindGmlChild(element, "pointMembers");
         if (membersEl is not null)
         {
@@ -401,9 +396,6 @@ internal static class GeometryParser
         return new GmlMultiPolygon { Polygons = polygons, SrsName = srsName, Version = version };
     }
 
-    /// <summary>
-    /// Parses MultiCurve as MultiLineString (flattening curves to line strings).
-    /// </summary>
     private static GmlMultiLineString? ParseMultiCurve(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -436,9 +428,6 @@ internal static class GeometryParser
         return new GmlMultiLineString { LineStrings = lineStrings, SrsName = srsName, Version = version };
     }
 
-    /// <summary>
-    /// Parses MultiSurface as MultiPolygon (flattening surfaces to polygons).
-    /// </summary>
     private static GmlMultiPolygon? ParseMultiSurface(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var srsName = XmlHelpers.GetSrsName(element);
@@ -467,56 +456,95 @@ internal static class GeometryParser
     }
 
     /// <summary>
-    /// Parses MultiGeometry — dispatches members individually.
-    /// Returns the first successfully parsed geometry as a best-effort approach.
+    /// Parses MultiGeometry by aggregating all member geometries into the best-fit
+    /// multi type (MultiPoint, MultiLineString, MultiPolygon) based on actual content.
     /// </summary>
     private static GmlGeometry? ParseMultiGeometry(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
-        var memberEls = XmlHelpers.FindGmlChildren(element, "geometryMember")
-            .Concat(XmlHelpers.FindGmlChildren(element, "geometryMembers").SelectMany(m => m.Elements()));
-
+        var srsName = XmlHelpers.GetSrsName(element);
         var geometries = new List<GmlGeometry>();
-        foreach (var memberEl in memberEls)
+
+        // geometryMember (singular) — child is wrapped
+        foreach (var memberEl in XmlHelpers.FindGmlChildren(element, "geometryMember"))
         {
             var child = memberEl.Elements().FirstOrDefault(e => XmlHelpers.IsGmlNamespace(e.Name.NamespaceName));
-            child ??= memberEl; // geometryMembers children are geometry elements directly
-
-            if (!XmlHelpers.IsGmlNamespace(child.Name.NamespaceName)) continue;
+            if (child is null) continue;
 
             var geom = Parse(child, version, issues);
             if (geom is not null)
                 geometries.Add(geom);
         }
 
-        // Return the best-fit multi type or first element
+        // geometryMembers (plural) — children are geometry elements directly
+        foreach (var membersEl in XmlHelpers.FindGmlChildren(element, "geometryMembers"))
+        {
+            foreach (var child in membersEl.Elements())
+            {
+                if (!XmlHelpers.IsGmlNamespace(child.Name.NamespaceName)) continue;
+
+                var geom = Parse(child, version, issues);
+                if (geom is not null)
+                    geometries.Add(geom);
+            }
+        }
+
         if (geometries.Count == 0) return null;
         if (geometries.Count == 1) return geometries[0];
 
-        // If all are points, return MultiPoint etc.
+        // Aggregate homogeneous collections
         if (geometries.All(g => g is GmlPoint))
             return new GmlMultiPoint
             {
                 Points = geometries.Cast<GmlPoint>().ToList(),
-                SrsName = XmlHelpers.GetSrsName(element),
+                SrsName = srsName,
                 Version = version
             };
 
-        // Fallback: return first geometry with a warning
+        if (geometries.All(g => g is GmlLineString))
+            return new GmlMultiLineString
+            {
+                LineStrings = geometries.Cast<GmlLineString>().ToList(),
+                SrsName = srsName,
+                Version = version
+            };
+
+        if (geometries.All(g => g is GmlPolygon))
+            return new GmlMultiPolygon
+            {
+                Polygons = geometries.Cast<GmlPolygon>().ToList(),
+                SrsName = srsName,
+                Version = version
+            };
+
+        // Heterogeneous: flatten into the broadest multi type possible
+        // Points + LineStrings → MultiLineString (points dropped with warning)
+        // Mixed with polygons → MultiPolygon (non-polygons dropped with warning)
         issues.Add(new GmlParseIssue
         {
             Severity = GmlIssueSeverity.Warning,
             Code = "heterogeneous_multi_geometry",
-            Message = $"MultiGeometry contains {geometries.Count} mixed geometry types, returning first",
+            Message = $"MultiGeometry contains {geometries.Count} mixed geometry types; " +
+                      "only the first type is preserved",
             Location = "MultiGeometry"
         });
+
+        // Group by first type and return the largest homogeneous group
+        var firstType = geometries[0].GetType();
+        var sameType = geometries.Where(g => g.GetType() == firstType).ToList();
+
+        if (firstType == typeof(GmlPoint))
+            return new GmlMultiPoint { Points = sameType.Cast<GmlPoint>().ToList(), SrsName = srsName, Version = version };
+        if (firstType == typeof(GmlLineString))
+            return new GmlMultiLineString { LineStrings = sameType.Cast<GmlLineString>().ToList(), SrsName = srsName, Version = version };
+        if (firstType == typeof(GmlPolygon))
+            return new GmlMultiPolygon { Polygons = sameType.Cast<GmlPolygon>().ToList(), SrsName = srsName, Version = version };
+
+        // Ultimate fallback: return first geometry
         return geometries[0];
     }
 
     // ---- Coordinate extraction helpers ----
 
-    /// <summary>
-    /// Extracts coordinates from an element using posList, pos, or coordinates children.
-    /// </summary>
     private static IReadOnlyList<GmlCoordinate>? ParseCoordinateList(XElement element, List<GmlParseIssue> issues)
     {
         var srsDim = XmlHelpers.GetSrsDimension(element);
@@ -526,7 +554,7 @@ internal static class GeometryParser
         if (posListEl is not null)
         {
             var dim = XmlHelpers.GetSrsDimension(posListEl, srsDim);
-            return XmlHelpers.ParsePosList(posListEl.Value, dim);
+            return XmlHelpers.ParsePosList(posListEl.Value, dim, issues);
         }
 
         // GML 3: multiple <pos> elements
@@ -536,7 +564,7 @@ internal static class GeometryParser
             var coords = new List<GmlCoordinate>(posEls.Count);
             foreach (var posEl in posEls)
             {
-                coords.Add(XmlHelpers.ParsePos(posEl.Value, srsDim));
+                coords.Add(XmlHelpers.ParsePos(posEl.Value, srsDim, issues));
             }
             return coords;
         }
@@ -545,7 +573,7 @@ internal static class GeometryParser
         var coordsEl = XmlHelpers.FindGmlChild(element, "coordinates");
         if (coordsEl is not null)
         {
-            return XmlHelpers.ParseGml2Coordinates(coordsEl.Value);
+            return XmlHelpers.ParseGml2Coordinates(coordsEl.Value, issues);
         }
 
         return null;
@@ -554,16 +582,33 @@ internal static class GeometryParser
     /// <summary>
     /// Parses a GML 2 coord element with X, Y, Z children.
     /// </summary>
-    private static GmlCoordinate ParseCoordElement(XElement coordEl)
+    private static GmlCoordinate ParseCoordElement(XElement coordEl, List<GmlParseIssue> issues)
     {
         var xEl = XmlHelpers.FindGmlChild(coordEl, "X");
         var yEl = XmlHelpers.FindGmlChild(coordEl, "Y");
         var zEl = XmlHelpers.FindGmlChild(coordEl, "Z");
 
-        double x = xEl is not null ? double.Parse(xEl.Value, System.Globalization.CultureInfo.InvariantCulture) : 0;
-        double y = yEl is not null ? double.Parse(yEl.Value, System.Globalization.CultureInfo.InvariantCulture) : 0;
-        double? z = zEl is not null ? double.Parse(zEl.Value, System.Globalization.CultureInfo.InvariantCulture) : null;
+        if (!TryParseCoordChild(xEl, out double x) || !TryParseCoordChild(yEl, out double y))
+        {
+            issues.Add(new GmlParseIssue
+            {
+                Severity = GmlIssueSeverity.Error,
+                Code = "invalid_coordinate",
+                Message = "Cannot parse coord X/Y values",
+                Location = "coord"
+            });
+            return new GmlCoordinate(0, 0);
+        }
 
+        double? z = zEl is not null && TryParseCoordChild(zEl, out var zVal) ? zVal : null;
         return new GmlCoordinate(x, y, z);
+    }
+
+    private static bool TryParseCoordChild(XElement? el, out double value)
+    {
+        value = 0;
+        return el is not null
+            && double.TryParse(el.Value, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out value);
     }
 }

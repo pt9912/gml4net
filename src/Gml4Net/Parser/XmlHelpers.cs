@@ -22,6 +22,15 @@ internal static class XmlHelpers
         ns == GmlNamespaces.Wfs1 || ns == GmlNamespaces.Wfs2;
 
     /// <summary>
+    /// Returns true if the local name is a known GML geometry element.
+    /// </summary>
+    internal static bool IsGeometryElement(string localName) => localName is
+        "Point" or "LineString" or "LinearRing" or "Polygon" or
+        "Envelope" or "Box" or "Curve" or "Surface" or
+        "MultiPoint" or "MultiLineString" or "MultiPolygon" or
+        "MultiCurve" or "MultiSurface" or "MultiGeometry";
+
+    /// <summary>
     /// Finds a direct child element with the given local name in any GML namespace.
     /// </summary>
     internal static XElement? FindGmlChild(XElement parent, string localName)
@@ -76,6 +85,7 @@ internal static class XmlHelpers
 
     /// <summary>
     /// Detects the GML version from namespace declarations in the document.
+    /// Single-pass traversal with early exit for performance.
     /// </summary>
     internal static GmlVersion DetectVersion(XDocument doc)
     {
@@ -83,66 +93,69 @@ internal static class XmlHelpers
         if (root is null)
             return GmlVersion.V3_2;
 
-        // Collect all namespace URIs from the document
-        var namespaces = root.DescendantsAndSelf()
-            .SelectMany(e => e.Attributes().Where(a => a.IsNamespaceDeclaration).Select(a => a.Value))
-            .ToHashSet();
+        bool hasGml = false;
+        bool hasGml2Indicators = false;
 
-        // Also check element namespaces
         foreach (var el in root.DescendantsAndSelf())
         {
-            namespaces.Add(el.Name.NamespaceName);
+            var elNs = el.Name.NamespaceName;
+
+            // Check element namespace
+            if (elNs == GmlNamespaces.Gml33) return GmlVersion.V3_3;
+            if (elNs == GmlNamespaces.Gml32) return GmlVersion.V3_2;
+            if (elNs == GmlNamespaces.Gml) hasGml = true;
+
+            // Check namespace declarations on this element
+            foreach (var attr in el.Attributes())
+            {
+                if (!attr.IsNamespaceDeclaration) continue;
+                var nsUri = attr.Value;
+                if (nsUri == GmlNamespaces.Gml33) return GmlVersion.V3_3;
+                if (nsUri == GmlNamespaces.Gml32) return GmlVersion.V3_2;
+                if (nsUri == GmlNamespaces.Gml) hasGml = true;
+            }
+
+            // Check GML 2 indicators while traversing
+            if (!hasGml2Indicators && IsGmlNamespace(elNs))
+            {
+                var localName = el.Name.LocalName;
+                if (localName is "coordinates" or "Box" or "outerBoundaryIs")
+                    hasGml2Indicators = true;
+            }
         }
 
-        if (namespaces.Contains(GmlNamespaces.Gml33))
-            return GmlVersion.V3_3;
-
-        if (namespaces.Contains(GmlNamespaces.Gml32))
-            return GmlVersion.V3_2;
-
-        if (namespaces.Contains(GmlNamespaces.Gml))
-        {
-            // Distinguish GML 2 from GML 3.0/3.1 via content heuristics
-            if (HasGml2Indicators(root))
-                return GmlVersion.V2_1_2;
-
-            return GmlVersion.V3_1;
-        }
+        if (hasGml)
+            return hasGml2Indicators ? GmlVersion.V2_1_2 : GmlVersion.V3_1;
 
         return GmlVersion.V3_2;
     }
 
-    private static bool HasGml2Indicators(XElement root)
-    {
-        // GML 2 indicators: <coordinates>, <Box>, <outerBoundaryIs>
-        foreach (var el in root.DescendantsAndSelf())
-        {
-            if (!IsGmlNamespace(el.Name.NamespaceName))
-                continue;
-
-            var localName = el.Name.LocalName;
-            if (localName is "coordinates" or "Box" or "outerBoundaryIs")
-                return true;
-        }
-        return false;
-    }
-
     /// <summary>
     /// Parses a GML 3 pos element value (e.g. "10.0 20.0") into a coordinate.
+    /// Returns false via issues list if values are not valid numbers.
     /// </summary>
-    internal static GmlCoordinate ParsePos(string text, int? srsDimension = null)
+    internal static GmlCoordinate ParsePos(string text, int? srsDimension = null, List<GmlParseIssue>? issues = null)
     {
         var parts = text.Trim().Split((char[])[' ', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
 
         if (parts.Length < 2)
             return new GmlCoordinate(0, 0);
 
-        double x = double.Parse(parts[0], CultureInfo.InvariantCulture);
-        double y = double.Parse(parts[1], CultureInfo.InvariantCulture);
-        double? z = parts.Length > 2 ? double.Parse(parts[2], CultureInfo.InvariantCulture) : null;
-        double? m = parts.Length > 3 ? double.Parse(parts[3], CultureInfo.InvariantCulture) : null;
+        if (!TryParseDouble(parts[0], out double x) || !TryParseDouble(parts[1], out double y))
+        {
+            issues?.Add(new GmlParseIssue
+            {
+                Severity = GmlIssueSeverity.Error,
+                Code = "invalid_coordinate",
+                Message = $"Cannot parse coordinate values: '{text.Trim()}'",
+                Location = "pos"
+            });
+            return new GmlCoordinate(0, 0);
+        }
 
-        // If srsDimension is 2, drop Z even if present
+        double? z = parts.Length > 2 && TryParseDouble(parts[2], out var zVal) ? zVal : null;
+        double? m = parts.Length > 3 && TryParseDouble(parts[3], out var mVal) ? mVal : null;
+
         if (srsDimension == 2)
             return new GmlCoordinate(x, y);
 
@@ -152,7 +165,7 @@ internal static class XmlHelpers
     /// <summary>
     /// Parses a GML 3 posList element value into a list of coordinates.
     /// </summary>
-    internal static IReadOnlyList<GmlCoordinate> ParsePosList(string text, int srsDimension)
+    internal static IReadOnlyList<GmlCoordinate> ParsePosList(string text, int srsDimension, List<GmlParseIssue>? issues = null)
     {
         text = text.Trim();
         if (string.IsNullOrEmpty(text))
@@ -162,7 +175,21 @@ internal static class XmlHelpers
         var values = new List<double>(parts.Length);
         foreach (var part in parts)
         {
-            values.Add(double.Parse(part, CultureInfo.InvariantCulture));
+            if (TryParseDouble(part, out var val))
+            {
+                values.Add(val);
+            }
+            else
+            {
+                issues?.Add(new GmlParseIssue
+                {
+                    Severity = GmlIssueSeverity.Error,
+                    Code = "invalid_coordinate",
+                    Message = $"Cannot parse coordinate value: '{part}'",
+                    Location = "posList"
+                });
+                return [];
+            }
         }
 
         if (srsDimension < 2) srsDimension = 2;
@@ -173,8 +200,8 @@ internal static class XmlHelpers
             double x = values[i];
             double y = values[i + 1];
             double? z = srsDimension >= 3 && i + 2 < values.Count ? values[i + 2] : null;
-            double? m = srsDimension >= 4 && i + 3 < values.Count ? values[i + 3] : null;
-            coords.Add(new GmlCoordinate(x, y, z, m));
+            double? m2 = srsDimension >= 4 && i + 3 < values.Count ? values[i + 3] : null;
+            coords.Add(new GmlCoordinate(x, y, z, m2));
         }
 
         return coords;
@@ -182,9 +209,8 @@ internal static class XmlHelpers
 
     /// <summary>
     /// Parses a GML 2 coordinates element value (e.g. "10.0,20.0 30.0,40.0").
-    /// Default separator is comma for coordinate parts and space/newline between tuples.
     /// </summary>
-    internal static IReadOnlyList<GmlCoordinate> ParseGml2Coordinates(string text)
+    internal static IReadOnlyList<GmlCoordinate> ParseGml2Coordinates(string text, List<GmlParseIssue>? issues = null)
     {
         text = text.Trim();
         if (string.IsNullOrEmpty(text))
@@ -198,13 +224,25 @@ internal static class XmlHelpers
             var parts = tuple.Split(',');
             if (parts.Length < 2) continue;
 
-            double x = double.Parse(parts[0].Trim(), CultureInfo.InvariantCulture);
-            double y = double.Parse(parts[1].Trim(), CultureInfo.InvariantCulture);
-            double? z = parts.Length > 2 ? double.Parse(parts[2].Trim(), CultureInfo.InvariantCulture) : null;
+            if (!TryParseDouble(parts[0].Trim(), out var x) || !TryParseDouble(parts[1].Trim(), out var y))
+            {
+                issues?.Add(new GmlParseIssue
+                {
+                    Severity = GmlIssueSeverity.Error,
+                    Code = "invalid_coordinate",
+                    Message = $"Cannot parse coordinate tuple: '{tuple}'",
+                    Location = "coordinates"
+                });
+                continue;
+            }
 
+            double? z = parts.Length > 2 && TryParseDouble(parts[2].Trim(), out var zVal) ? zVal : null;
             coords.Add(new GmlCoordinate(x, y, z));
         }
 
         return coords;
     }
+
+    private static bool TryParseDouble(string s, out double result) =>
+        double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out result);
 }

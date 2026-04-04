@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Xml.Linq;
 using Gml4Net.Model;
@@ -123,7 +124,7 @@ internal static class FeatureParser
         return new GmlFeature
         {
             Id = id,
-            Properties = properties
+            Properties = new ReadOnlyDictionary<string, GmlPropertyValue>(properties)
         };
     }
 
@@ -134,7 +135,7 @@ internal static class FeatureParser
     {
         // Check if any child is a known geometry element
         var gmlChild = element.Elements().FirstOrDefault(e =>
-            XmlHelpers.IsGmlNamespace(e.Name.NamespaceName) && IsGeometryLocalName(e.Name.LocalName));
+            XmlHelpers.IsGmlNamespace(e.Name.NamespaceName) && XmlHelpers.IsGeometryElement(e.Name.LocalName));
 
         if (gmlChild is not null)
         {
@@ -183,7 +184,7 @@ internal static class FeatureParser
             }
 
             if (nested.Count > 0)
-                return new GmlNestedProperty { Children = nested };
+                return new GmlNestedProperty { Children = new ReadOnlyDictionary<string, GmlPropertyValue>(nested) };
         }
 
         // Fallback: raw XML
@@ -204,9 +205,4 @@ internal static class FeatureParser
         return nonGmlChild ?? memberElement.Elements().FirstOrDefault();
     }
 
-    private static bool IsGeometryLocalName(string localName) => localName is
-        "Point" or "LineString" or "LinearRing" or "Polygon" or
-        "Envelope" or "Box" or "Curve" or "Surface" or
-        "MultiPoint" or "MultiLineString" or "MultiPolygon" or
-        "MultiCurve" or "MultiSurface" or "MultiGeometry";
 }

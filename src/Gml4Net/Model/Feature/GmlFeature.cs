@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace Gml4Net.Model.Feature;
 
 /// <summary>
@@ -10,5 +12,5 @@ public sealed class GmlFeature : GmlNode, IGmlRootContent
 
     /// <summary>Feature properties keyed by name.</summary>
     public IReadOnlyDictionary<string, GmlPropertyValue> Properties { get; init; }
-        = new Dictionary<string, GmlPropertyValue>();
+        = ReadOnlyDictionary<string, GmlPropertyValue>.Empty;
 }
