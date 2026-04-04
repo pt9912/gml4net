@@ -297,44 +297,56 @@ Geometrie  Parser     Parser +   GeoJSON    WCS        + I/O      Builder
 
 #### 6.1 Streaming-Parser
 
-- [ ] `GmlFeatureStreamParser`:
-  - [ ] `ParseAsync(Stream)` → `IAsyncEnumerable<GmlFeature>`
-  - [ ] `ProcessFeaturesAsync(Stream, Func<GmlFeature, Task>)` → `Task<int>`
-  - [ ] Basiert auf `XmlReader` (forward-only)
-  - [ ] Erkennt Feature-Member-Grenzen:
+- [x] `GmlFeatureStreamParser`:
+  - [x] `ParseAsync(Stream)` → `IAsyncEnumerable<GmlFeature>`
+  - [x] `ParseAsync(XmlReader)` → internes Overload fuer vorpositionierte Reader
+  - [x] `ProcessFeaturesAsync(Stream, Func<GmlFeature, Task>)` → `Task<int>`
+  - [x] Basiert auf `XmlReader` (forward-only, O(1) Speicher)
+  - [x] Erkennt Feature-Member-Grenzen:
     - `gml:featureMember` (GML 2/WFS 1.0-1.1)
     - `wfs:member` (WFS 2.0)
-    - `gml:featureMembers` (Plural, GML 3.1)
-  - [ ] Liest Subtree per `XElement.ReadFrom(XmlReader)`
-  - [ ] Uebergibt Fragmente an bestehende `FeatureParser`/`GeometryParser`
-  - [ ] `CancellationToken`-Support
-- [ ] Tests:
-  - [ ] Kleines Dokument (Vergleich mit DOM-Ergebnis)
-  - [ ] Grosses synthetisches Dokument (10.000+ Features)
-  - [ ] Verschiedene Member-Varianten
-  - [ ] Cancellation
+    - `gml:featureMembers` (Plural, GML 3.1) -- forward-only mit `alreadyPositioned`-Flag
+  - [x] Liest einzelne Features per `XNode.ReadFromAsync(XmlReader)` als DOM-Fragment
+  - [x] Uebergibt Fragmente an bestehende `FeatureParser`/`GeometryParser`
+  - [x] GML-Versionserkennung per Feature-Fragment (`XmlHelpers.DetectVersion` Overload)
+  - [x] `CancellationToken`-Support mit kooperativer Cancellation
+- [x] Tests (11 Streaming-Tests):
+  - [x] WFS 2.0 `wfs:member`, GML `featureMember`, `featureMembers` (Plural)
+  - [x] DOM/Streaming-Ergebnisvergleich
+  - [x] 10.000-Feature-Dokument
+  - [x] Cooperative Cancellation nach 5 Features
+  - [x] `ProcessFeaturesAsync` Callback + Count
+  - [x] Leere Collection
+  - [x] GML 2 Versionserkennung im Streaming
+  - [x] GML 3.1 Legacy-Versionserkennung
+  - [x] Null-Guard-Tests
 
 #### 6.2 I/O-Paket (Gml4Net.IO)
 
-- [ ] Projekt `Gml4Net.IO` anlegen (referenziert `Gml4Net`)
-- [ ] Projekt `Gml4Net.IO.Tests` anlegen
-- [ ] `GmlIo`:
-  - [ ] `ParseFile(string path)` → synchrones File-Parsing
-  - [ ] `ParseFileAsync(string path)` → asynchrones File-Parsing
-  - [ ] `ParseUrlAsync(Uri, HttpClient?)` → HTTP GET + OWS-Erkennung
-  - [ ] `StreamFeaturesFromFile(string path)` → `IAsyncEnumerable<GmlFeature>`
-  - [ ] `StreamFeaturesFromUrl(Uri, HttpClient?)` → `IAsyncEnumerable<GmlFeature>`
-  - [ ] `GmlIoException` fuer Transportfehler (nicht GmlParseIssue):
+- [x] Projekt `Gml4Net.IO` angelegt (referenziert `Gml4Net`)
+- [x] Projekt `Gml4Net.IO.Tests` angelegt
+- [x] `GmlIo`:
+  - [x] `ParseFile(string path)` → synchrones File-Parsing
+  - [x] `ParseFileAsync(string path)` → asynchrones File-Parsing
+  - [x] `ParseUrlAsync(Uri, HttpClient?)` → HTTP GET + OWS-Erkennung
+  - [x] `StreamFeaturesFromFile(string path)` → `IAsyncEnumerable<GmlFeature>`
+  - [x] `StreamFeaturesFromUrl(Uri, HttpClient?)` → `IAsyncEnumerable<GmlFeature>`
+    mit OWS-Detection im Streaming-Pfad via `XmlReader`-Vorpruefung
+  - [x] `GmlIoException` (sealed) fuer Transportfehler:
     - `file_not_found` -- Datei existiert nicht
-    - `file_read_error` -- Datei nicht lesbar
-    - `http_error` -- HTTP-Statuscode != 2xx (mit StatusCode Property)
+    - `file_read_error` -- Datei nicht lesbar / Zugriff verweigert
+    - `http_error` -- HTTP-Statuscode != 2xx (mit HttpStatusCode Property)
     - `network_error` -- Verbindungsfehler
-    - OWS Exceptions → als `GmlParseIssue` im Result (HTTP 200, fachlicher Fehler)
-- [ ] Tests:
-  - [ ] Datei-Parsing (existierende und nicht-existierende Dateien)
-  - [ ] URL-Parsing mit MockHttpMessageHandler
-  - [ ] OWS-Exception-Erkennung in HTTP-Antworten
-  - [ ] Streaming von Datei und URL
+    - `ows_exception` -- OWS ExceptionReport im Streaming-Pfad
+    - OWS Exceptions bei `ParseUrlAsync` → als `GmlParseIssue` im Result
+- [x] Tests (19 I/O-Tests):
+  - [x] Datei-Parsing sync/async (existierende und nicht-existierende Dateien)
+  - [x] URL-Parsing mit MockHttpMessageHandler
+  - [x] OWS-Exception-Erkennung in HTTP-Antworten (DOM + Streaming)
+  - [x] Streaming von Datei und URL
+  - [x] HTTP-Fehler (404, 500)
+  - [x] Response-Disposal-Tracking
+  - [x] Null-Guard-Tests
 
 **Portierungsquellen:**
 - `gml4dart/lib/src/parser/streaming/gml_feature_stream_parser.dart`
