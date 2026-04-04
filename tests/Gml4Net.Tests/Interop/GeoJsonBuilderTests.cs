@@ -167,15 +167,19 @@ public class GeoJsonBuilderTests
         var feature = new GmlFeature
         {
             Id = "f.1",
-            Properties = new Dictionary<string, GmlPropertyValue>
-            {
-                ["name"] = new GmlStringProperty { Value = "Test" },
-                ["value"] = new GmlNumericProperty { Value = 42 },
-                ["geom"] = new GmlGeometryProperty
+            Properties = new GmlPropertyBag(
+            [
+                new GmlPropertyEntry { Name = "name", Value = new GmlStringProperty { Value = "Test" } },
+                new GmlPropertyEntry { Name = "value", Value = new GmlNumericProperty { Value = 42 } },
+                new GmlPropertyEntry
                 {
-                    Geometry = new GmlPoint { Coordinate = new(1, 2) }
+                    Name = "geom",
+                    Value = new GmlGeometryProperty
+                    {
+                        Geometry = new GmlPoint { Coordinate = new(1, 2) }
+                    }
                 }
-            }
+            ])
         };
         var json = GeoJsonBuilder.Feature(feature);
 
@@ -191,16 +195,20 @@ public class GeoJsonBuilderTests
     {
         var feature = new GmlFeature
         {
-            Properties = new Dictionary<string, GmlPropertyValue>
-            {
-                ["addr"] = new GmlNestedProperty
+            Properties = new GmlPropertyBag(
+            [
+                new GmlPropertyEntry
                 {
-                    Children = new Dictionary<string, GmlPropertyValue>
+                    Name = "addr",
+                    Value = new GmlNestedProperty
                     {
-                        ["city"] = new GmlStringProperty { Value = "Berlin" }
+                        Children = new GmlPropertyBag(
+                        [
+                            new GmlPropertyEntry { Name = "city", Value = new GmlStringProperty { Value = "Berlin" } }
+                        ])
                     }
                 }
-            }
+            ])
         };
         var json = GeoJsonBuilder.Feature(feature);
 
@@ -212,14 +220,34 @@ public class GeoJsonBuilderTests
     {
         var feature = new GmlFeature
         {
-            Properties = new Dictionary<string, GmlPropertyValue>
-            {
-                ["data"] = new GmlRawXmlProperty { XmlContent = "<x>raw</x>" }
-            }
+            Properties = new GmlPropertyBag(
+            [
+                new GmlPropertyEntry { Name = "data", Value = new GmlRawXmlProperty { XmlContent = "<x>raw</x>" } }
+            ])
         };
         var json = GeoJsonBuilder.Feature(feature);
 
         json["properties"]!["data"]!.GetValue<string>().Should().Be("<x>raw</x>");
+    }
+
+    [Fact]
+    public void Feature_WithRepeatedProperties_ConvertsDuplicatesToJsonArray()
+    {
+        var feature = new GmlFeature
+        {
+            Properties = new GmlPropertyBag(
+            [
+                new GmlPropertyEntry { Name = "tag", Value = new GmlStringProperty { Value = "a" } },
+                new GmlPropertyEntry { Name = "tag", Value = new GmlStringProperty { Value = "b" } }
+            ])
+        };
+
+        var json = GeoJsonBuilder.Feature(feature);
+        var tags = json["properties"]!["tag"]!.AsArray();
+
+        tags.Should().HaveCount(2);
+        tags[0]!.GetValue<string>().Should().Be("a");
+        tags[1]!.GetValue<string>().Should().Be("b");
     }
 
     // ---- FeatureCollection ----
@@ -374,10 +402,10 @@ public class GeoJsonBuilderTests
     {
         var feature = new GmlFeature
         {
-            Properties = new Dictionary<string, GmlPropertyValue>
-            {
-                ["name"] = new GmlStringProperty { Value = "no-geom" }
-            }
+            Properties = new GmlPropertyBag(
+            [
+                new GmlPropertyEntry { Name = "name", Value = new GmlStringProperty { Value = "no-geom" } }
+            ])
         };
         var json = GeoJsonBuilder.Feature(feature);
         var jsonStr = json.ToJsonString();

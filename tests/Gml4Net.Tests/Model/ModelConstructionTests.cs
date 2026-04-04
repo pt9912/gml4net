@@ -127,6 +127,7 @@ public class ModelConstructionTests
     {
         var feature = new GmlFeature();
         feature.Properties.Should().BeEmpty();
+        feature.Properties.Entries.Should().BeEmpty();
         feature.Id.Should().BeNull();
     }
 
@@ -151,10 +152,10 @@ public class ModelConstructionTests
         };
         GmlPropertyValue nested = new GmlNestedProperty
         {
-            Children = new Dictionary<string, GmlPropertyValue>
-            {
-                ["a"] = new GmlStringProperty { Value = "b" }
-            }
+            Children = new GmlPropertyBag(
+            [
+                new GmlPropertyEntry { Name = "a", Value = new GmlStringProperty { Value = "b" } }
+            ])
         };
         GmlPropertyValue raw = new GmlRawXmlProperty { XmlContent = "<x/>" };
 

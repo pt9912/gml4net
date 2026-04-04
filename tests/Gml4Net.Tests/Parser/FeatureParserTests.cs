@@ -192,8 +192,8 @@ public class FeatureParserTests
             .Which.Value.Should().Be("Main St");
         address.Children["city"].Should().BeOfType<GmlStringProperty>()
             .Which.Value.Should().Be("Berlin");
-        address.Children["zip"].Should().BeOfType<GmlNumericProperty>()
-            .Which.Value.Should().Be(10115);
+        address.Children["zip"].Should().BeOfType<GmlStringProperty>()
+            .Which.Value.Should().Be("10115");
     }
 
     // ---- Feature Without Geometry ----
@@ -280,8 +280,8 @@ public class FeatureParserTests
         feature.Id.Should().Be("building.99");
         feature.Properties["name"].Should().BeOfType<GmlStringProperty>()
             .Which.Value.Should().Be("Standalone Building");
-        feature.Properties["floors"].Should().BeOfType<GmlNumericProperty>()
-            .Which.Value.Should().Be(3);
+        feature.Properties["floors"].Should().BeOfType<GmlStringProperty>()
+            .Which.Value.Should().Be("3");
     }
 
     // ---- Empty FeatureCollection ----
@@ -351,11 +351,13 @@ public class FeatureParserTests
                 <gml:featureMember>
                     <app:A gml:id="a.1"><app:x>1</app:x></app:A>
                 </gml:featureMember>
+                <gml:featureMembers>
+                    <app:C gml:id="c.1"><app:x>3</app:x></app:C>
+                </gml:featureMembers>
                 <wfs:member>
                     <app:B gml:id="b.1"><app:x>2</app:x></app:B>
                 </wfs:member>
                 <gml:featureMembers>
-                    <app:C gml:id="c.1"><app:x>3</app:x></app:C>
                     <app:D gml:id="d.1"><app:x>4</app:x></app:D>
                 </gml:featureMembers>
             </gml:FeatureCollection>
@@ -367,8 +369,8 @@ public class FeatureParserTests
         var fc = result.Document!.Root.Should().BeOfType<GmlFeatureCollection>().Subject;
         fc.Features.Should().HaveCount(4);
         fc.Features[0].Id.Should().Be("a.1");
-        fc.Features[1].Id.Should().Be("b.1");
-        fc.Features[2].Id.Should().Be("c.1");
+        fc.Features[1].Id.Should().Be("c.1");
+        fc.Features[2].Id.Should().Be("b.1");
         fc.Features[3].Id.Should().Be("d.1");
     }
 

@@ -48,15 +48,15 @@ public static class GeoJsonBuilder
         JsonNode? geometryNode = null;
         var properties = new JsonObject();
 
-        foreach (var (key, value) in feature.Properties)
+        foreach (var entry in feature.Properties.Entries)
         {
-            if (value is GmlGeometryProperty gp && geometryNode is null)
+            if (entry.Value is GmlGeometryProperty gp && geometryNode is null)
             {
                 geometryNode = Geometry(gp.Geometry);
             }
             else
             {
-                properties[key] = ConvertPropertyValue(value);
+                AppendPropertyValue(properties, entry.Name, ConvertPropertyValue(entry.Value));
             }
         }
 
@@ -300,10 +300,27 @@ public static class GeoJsonBuilder
     private static JsonObject ConvertNestedProperty(GmlNestedProperty nested)
     {
         var obj = new JsonObject();
-        foreach (var (key, val) in nested.Children)
+        foreach (var entry in nested.Children.Entries)
         {
-            obj[key] = ConvertPropertyValue(val);
+            AppendPropertyValue(obj, entry.Name, ConvertPropertyValue(entry.Value));
         }
         return obj;
+    }
+
+    private static void AppendPropertyValue(JsonObject obj, string name, JsonNode? value)
+    {
+        if (!obj.TryGetPropertyValue(name, out var existing))
+        {
+            obj[name] = value;
+            return;
+        }
+
+        if (existing is JsonArray array)
+        {
+            array.Add(value);
+            return;
+        }
+
+        obj[name] = new JsonArray(existing?.DeepClone(), value);
     }
 }

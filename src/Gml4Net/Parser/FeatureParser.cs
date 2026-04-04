@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Xml.Linq;
 using Gml4Net.Model;
@@ -17,69 +16,39 @@ internal static class FeatureParser
     /// </summary>
     internal static GmlFeatureCollection? ParseCollection(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
-        // Extract boundedBy
         GmlEnvelope? boundedBy = null;
-        var boundedByEl = XmlHelpers.FindGmlChild(element, "boundedBy");
-        if (boundedByEl is not null)
-        {
-            var envEl = XmlHelpers.FindGmlChild(boundedByEl, "Envelope");
-            if (envEl is not null)
-            {
-                boundedBy = GeometryParser.Parse(envEl, version, issues) as GmlEnvelope;
-            }
-            else
-            {
-                var boxEl = XmlHelpers.FindGmlChild(boundedByEl, "Box");
-                if (boxEl is not null)
-                {
-                    var box = GeometryParser.Parse(boxEl, version, issues) as GmlBox;
-                    if (box is not null)
-                    {
-                        boundedBy = new GmlEnvelope
-                        {
-                            LowerCorner = box.LowerCorner,
-                            UpperCorner = box.UpperCorner,
-                            SrsName = box.SrsName
-                        };
-                    }
-                }
-            }
-        }
-
         var features = new List<GmlFeature>();
 
-        // gml:featureMember (singular, GML 2 / WFS 1.0-1.1)
-        foreach (var memberEl in XmlHelpers.FindGmlChildren(element, "featureMember"))
+        foreach (var child in element.Elements())
         {
-            var featureEl = FindFeatureChild(memberEl);
-            if (featureEl is not null)
+            if (XmlHelpers.IsGmlNamespace(child.Name.NamespaceName) && child.Name.LocalName == "boundedBy")
             {
-                var feature = ParseFeature(featureEl, version, issues);
-                if (feature is not null)
-                    features.Add(feature);
+                boundedBy = ParseBoundedBy(child, version, issues);
+                continue;
             }
-        }
 
-        // wfs:member (WFS 2.0)
-        foreach (var memberEl in XmlHelpers.FindWfsChildren(element, "member"))
-        {
-            var featureEl = FindFeatureChild(memberEl);
-            if (featureEl is not null)
+            if (XmlHelpers.IsGmlNamespace(child.Name.NamespaceName) && child.Name.LocalName == "featureMember")
             {
-                var feature = ParseFeature(featureEl, version, issues);
-                if (feature is not null)
-                    features.Add(feature);
+                var feature = ParseFeatureMember(child, version, issues);
+                if (feature is not null) features.Add(feature);
+                continue;
             }
-        }
 
-        // gml:featureMembers (plural, GML 3.1)
-        foreach (var membersEl in XmlHelpers.FindGmlChildren(element, "featureMembers"))
-        {
-            foreach (var child in membersEl.Elements())
+            if (XmlHelpers.IsWfsNamespace(child.Name.NamespaceName) && child.Name.LocalName == "member")
             {
-                var feature = ParseFeature(child, version, issues);
-                if (feature is not null)
-                    features.Add(feature);
+                var feature = ParseFeatureMember(child, version, issues);
+                if (feature is not null) features.Add(feature);
+                continue;
+            }
+
+            if (XmlHelpers.IsGmlNamespace(child.Name.NamespaceName) && child.Name.LocalName == "featureMembers")
+            {
+                foreach (var featureEl in child.Elements())
+                {
+                    var feature = ParseFeature(featureEl, version, issues);
+                    if (feature is not null)
+                        features.Add(feature);
+                }
             }
         }
 
@@ -96,7 +65,7 @@ internal static class FeatureParser
     internal static GmlFeature? ParseFeature(XElement element, GmlVersion version, List<GmlParseIssue> issues)
     {
         var id = XmlHelpers.GetFeatureId(element);
-        var properties = new Dictionary<string, GmlPropertyValue>();
+        var properties = new List<GmlPropertyEntry>();
 
         foreach (var child in element.Elements())
         {
@@ -108,23 +77,13 @@ internal static class FeatureParser
             var propValue = ParsePropertyValue(child, version, issues);
 
             if (propValue is not null)
-            {
-                // Handle duplicate property names by appending index
-                if (properties.ContainsKey(propName))
-                {
-                    var idx = 2;
-                    while (properties.ContainsKey($"{propName}_{idx}"))
-                        idx++;
-                    propName = $"{propName}_{idx}";
-                }
-                properties[propName] = propValue;
-            }
+                properties.Add(new GmlPropertyEntry { Name = propName, Value = propValue });
         }
 
         return new GmlFeature
         {
             Id = id,
-            Properties = new ReadOnlyDictionary<string, GmlPropertyValue>(properties)
+            Properties = new GmlPropertyBag(properties)
         };
     }
 
@@ -152,8 +111,7 @@ internal static class FeatureParser
             if (string.IsNullOrEmpty(text))
                 return new GmlStringProperty { Value = string.Empty };
 
-            // Try numeric
-            if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var numValue))
+            if (TryParseNumericProperty(text, out var numValue))
                 return new GmlNumericProperty { Value = numValue };
 
             return new GmlStringProperty { Value = text };
@@ -165,26 +123,16 @@ internal static class FeatureParser
         // If children are non-GML elements, treat as nested properties
         if (children.All(c => !XmlHelpers.IsGmlNamespace(c.Name.NamespaceName)))
         {
-            var nested = new Dictionary<string, GmlPropertyValue>();
+            var nested = new List<GmlPropertyEntry>();
             foreach (var child in children)
             {
                 var childValue = ParsePropertyValue(child, version, issues);
                 if (childValue is not null)
-                {
-                    var key = child.Name.LocalName;
-                    if (nested.ContainsKey(key))
-                    {
-                        var idx = 2;
-                        while (nested.ContainsKey($"{key}_{idx}"))
-                            idx++;
-                        key = $"{key}_{idx}";
-                    }
-                    nested[key] = childValue;
-                }
+                    nested.Add(new GmlPropertyEntry { Name = child.Name.LocalName, Value = childValue });
             }
 
             if (nested.Count > 0)
-                return new GmlNestedProperty { Children = new ReadOnlyDictionary<string, GmlPropertyValue>(nested) };
+                return new GmlNestedProperty { Children = new GmlPropertyBag(nested) };
         }
 
         // Fallback: raw XML
@@ -194,14 +142,107 @@ internal static class FeatureParser
     /// <summary>
     /// Finds the first non-wrapper child element inside a featureMember/member.
     /// </summary>
+    private static GmlEnvelope? ParseBoundedBy(XElement boundedByEl, GmlVersion version, List<GmlParseIssue> issues)
+    {
+        var envEl = XmlHelpers.FindGmlChild(boundedByEl, "Envelope");
+        if (envEl is not null)
+            return GeometryParser.Parse(envEl, version, issues) as GmlEnvelope;
+
+        var boxEl = XmlHelpers.FindGmlChild(boundedByEl, "Box");
+        if (boxEl is null)
+            return null;
+
+        var box = GeometryParser.Parse(boxEl, version, issues) as GmlBox;
+        if (box is null)
+            return null;
+
+        return new GmlEnvelope
+        {
+            LowerCorner = box.LowerCorner,
+            UpperCorner = box.UpperCorner,
+            SrsName = box.SrsName
+        };
+    }
+
+    private static GmlFeature? ParseFeatureMember(XElement memberElement, GmlVersion version, List<GmlParseIssue> issues)
+    {
+        var featureEl = FindFeatureChild(memberElement);
+        if (featureEl is null)
+        {
+            issues.Add(new GmlParseIssue
+            {
+                Severity = GmlIssueSeverity.Warning,
+                Code = "missing_feature_member",
+                Message = $"Feature wrapper '{memberElement.Name.LocalName}' does not contain a feature element.",
+                Location = memberElement.Name.LocalName
+            });
+            return null;
+        }
+
+        return ParseFeature(featureEl, version, issues);
+    }
+
     private static XElement? FindFeatureChild(XElement memberElement)
     {
-        // The first child element that is not in a GML/WFS namespace,
-        // or the first child element overall
-        var nonGmlChild = memberElement.Elements()
+        return memberElement.Elements()
             .FirstOrDefault(e => !XmlHelpers.IsGmlNamespace(e.Name.NamespaceName)
                               && !XmlHelpers.IsWfsNamespace(e.Name.NamespaceName));
+    }
 
-        return nonGmlChild ?? memberElement.Elements().FirstOrDefault();
+    private static bool TryParseNumericProperty(string text, out double value)
+    {
+        value = 0;
+
+        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+            || double.IsNaN(parsed) || double.IsInfinity(parsed))
+        {
+            return false;
+        }
+
+        if (LooksLikeFloatingPoint(text))
+        {
+            var unsigned = text[0] is '+' or '-' ? text[1..] : text;
+            if (unsigned.Length > 1 && unsigned[0] == '0' && unsigned[1] != '.' && unsigned[1] != 'e' && unsigned[1] != 'E')
+                return false;
+
+            value = parsed;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool LooksLikeFloatingPoint(string text)
+    {
+        var hasDecimalOrExponent = false;
+
+        for (var i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            if (char.IsAsciiDigit(c))
+                continue;
+
+            if (c is '+' or '-')
+            {
+                if (i == 0)
+                    continue;
+
+                var previous = text[i - 1];
+                if (previous is 'e' or 'E')
+                    continue;
+
+                return false;
+            }
+
+            if (c is '.' or 'e' or 'E')
+            {
+                hasDecimalOrExponent = true;
+                continue;
+            }
+
+            return false;
+        }
+
+        return hasDecimalOrExponent;
     }
 }

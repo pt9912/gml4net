@@ -165,8 +165,14 @@ public class DispatchAndFeatureEdgeCaseTests
 
         var feature = (result.Document!.Root as GmlFeatureCollection)!.Features[0];
         feature.Properties.Should().ContainKey("tag");
-        feature.Properties.Should().ContainKey("tag_2");
-        feature.Properties.Should().ContainKey("tag_3");
+        feature.Properties.Entries.Should().HaveCount(3);
+        feature.Properties.GetValues("tag").Should().HaveCount(3);
+        feature.Properties.GetValues("tag")[0].Should().BeOfType<GmlStringProperty>()
+            .Which.Value.Should().Be("first");
+        feature.Properties.GetValues("tag")[1].Should().BeOfType<GmlStringProperty>()
+            .Which.Value.Should().Be("second");
+        feature.Properties.GetValues("tag")[2].Should().BeOfType<GmlStringProperty>()
+            .Which.Value.Should().Be("third");
     }
 
     [Fact]
@@ -331,7 +337,26 @@ public class DispatchAndFeatureEdgeCaseTests
         var feature = (result.Document!.Root as GmlFeatureCollection)!.Features[0];
         var nested = feature.Properties["meta"].Should().BeOfType<GmlNestedProperty>().Subject;
         nested.Children.Should().ContainKey("key");
-        nested.Children.Should().ContainKey("key_2");
+        nested.Children.Entries.Should().HaveCount(2);
+        nested.Children.GetValues("key").Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void ParseXmlString_WithEmptyMemberWrapper_AddsParseIssue()
+    {
+        var xml = """
+            <wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0"
+                                   xmlns:gml="http://www.opengis.net/gml/3.2">
+                <wfs:member />
+            </wfs:FeatureCollection>
+            """;
+
+        var result = GmlParser.ParseXmlString(xml);
+
+        result.HasErrors.Should().BeFalse();
+        result.Issues.Should().Contain(i => i.Code == "missing_feature_member");
+        var featureCollection = result.Document!.Root.Should().BeOfType<GmlFeatureCollection>().Subject;
+        featureCollection.Features.Should().BeEmpty();
     }
 
     // ---- GML 2 Polygon with innerBoundaryIs ----

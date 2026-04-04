@@ -34,8 +34,8 @@ public sealed class GmlGeometryProperty : GmlPropertyValue
 /// <summary>Nested property containing child properties.</summary>
 public sealed class GmlNestedProperty : GmlPropertyValue
 {
-    /// <summary>Child properties keyed by name.</summary>
-    public required IReadOnlyDictionary<string, GmlPropertyValue> Children { get; init; }
+    /// <summary>Child properties in document order.</summary>
+    public GmlPropertyBag Children { get; init; } = GmlPropertyBag.Empty;
 }
 
 /// <summary>Raw XML property for unclassifiable content.</summary>
