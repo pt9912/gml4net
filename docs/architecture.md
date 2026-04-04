@@ -653,6 +653,13 @@ public void ParseXmlString_WithGml32Point_ReturnsGmlPoint()
 - `xunit` (Test-Framework)
 - `FluentAssertions` (lesbare Assertions)
 - `Microsoft.NET.Test.Sdk` (Runner)
+- `coverlet.msbuild` (Coverage-Erfassung und Schwellwert-Pruefung)
+
+### Coverage-Gate
+
+- Die Test-Suite wird mit einer harten Mindestabdeckung von 90% Line Coverage ausgefuehrt.
+- Unterschreitet ein Testlauf die Schwelle, schlaegt der Build fehl.
+- Die Schwelle wird im Docker-Testtarget erzwungen, damit sie lokal und in CI identisch wirkt.
 
 ---
 

@@ -106,6 +106,7 @@ Geometrie  Parser     Parser +   GeoJSON    WCS        + I/O      Builder
 - [x] `VersionDetectionTests` -- GML 2/3 Namespace-Erkennung
 - [x] `GeometryParserTests` -- alle Geometrie-Typen, GML 2 + GML 3 Varianten
 - [x] `EdgeCaseTests` -- malformed XML, fehlende Koordinaten, leere Elemente
+- [x] Coverage-Gate auf 90% Line Coverage im Docker-Testworkflow festgelegt
 
 **Portierungsquellen:**
 - `gml4dart/lib/src/model/` (alle Modell-Dateien)
@@ -402,8 +403,9 @@ Jede Phase gilt als abgeschlossen, wenn:
 1. **Alle Aufgaben erledigt** -- Checkliste vollstaendig abgehakt
 2. **Tests gruen** -- `dotnet test` laeuft fehlerfrei
 3. **Null Warnings** -- `TreatWarningsAsErrors` ist aktiviert
-4. **API dokumentiert** -- XML-Doc-Comments auf allen oeffentlichen Typen und Methoden
-5. **Paritaet geprueft** -- Vergleich mit gml4dart/s-gml Testergebnissen
+4. **Coverage eingehalten** -- mindestens 90% Line Coverage ueber den Testlauf
+5. **API dokumentiert** -- XML-Doc-Comments auf allen oeffentlichen Typen und Methoden
+6. **Paritaet geprueft** -- Vergleich mit gml4dart/s-gml Testergebnissen
    fuer die jeweilige Funktionalitaet
 
 ---

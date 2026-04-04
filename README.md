@@ -177,6 +177,7 @@ The repository now includes a multi-stage [Dockerfile](Dockerfile) for the plann
 - Build stages: `restore`, `build`, `test`, `pack`, `push`
 - Package output stage: `artifacts`
 - Release target: `nuget.org`
+- Coverage gate in `test`: at least 90% line coverage
 
 Example commands once the solution and projects exist:
 
@@ -192,7 +193,8 @@ Notes:
 - The preferred credential flow is a BuildKit secret named `nuget_api_key`
 - `NUGET_API_KEY` is also supported as a build argument for CI systems that cannot mount secrets
 - The example commands use `docker buildx build` because the Dockerfile relies on BuildKit features
-- The Dockerfile is a scaffold for the design-phase project and will become executable once `GML4Net.sln` and the referenced projects exist
+- The `test` stage enforces `/p:Threshold=90 /p:ThresholdType=line /p:ThresholdStat=total`
+- The current test project uses `coverlet.msbuild`; the 90% gate is enforced via the Docker test stage
 
 ## Requirements
 
