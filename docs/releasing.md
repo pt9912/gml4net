@@ -136,3 +136,25 @@ Die `.nupkg`-Dateien landen im `./artifacts/`-Verzeichnis (wenige KB).
 - [ ] Keine uncommitteten Aenderungen (`git status`)
 - [ ] Main-Branch ist aktuell (`git pull`)
 - [ ] Version noch nicht auf nuget.org vorhanden
+
+## Wichtig: CHANGELOG vor dem Tag aktualisieren
+
+Der Publish-Workflow baut das Paket aus dem Commit auf den der Tag zeigt.
+Die CHANGELOG.md muss daher **vor** dem Erstellen des Tags committet und
+gepusht werden, damit sie im Paket enthalten ist.
+
+Reihenfolge:
+
+1. CHANGELOG.md mit neuem Versionsabschnitt committen
+2. `git push origin main`
+3. Tags erstellen und pushen
+
+Wenn die CHANGELOG erst nach dem Tag aktualisiert wird, enthaelt das
+veroeffentlichte Paket die alte CHANGELOG.
+
+## Bisherige Releases
+
+| Version | Datum | Pakete | Anmerkung |
+|---|---|---|---|
+| 0.1.0 | 2026-04-04 | Gml4Net, Gml4Net.IO | Initiales Release, fehlende README in .nupkg |
+| 0.1.1 | 2026-04-04 | Gml4Net, Gml4Net.IO | README in NuGet-Paketen eingebettet |
