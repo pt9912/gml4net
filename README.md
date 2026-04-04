@@ -184,7 +184,7 @@ Example commands once the solution and projects exist:
 
 ```bash
 docker buildx build --target test -t gml4net:test .
-docker buildx build --target pack --build-arg PACKAGE_VERSION=0.1.0 -o type=local,dest=./artifacts .
+docker buildx build --target artifacts --build-arg PACKAGE_VERSION=0.1.0 -o type=local,dest=./artifacts .
 docker buildx build --target push --secret id=nuget_api_key,src=/path/to/nuget-api-key.txt --build-arg PACKAGE_VERSION=0.1.0 .
 ```
 

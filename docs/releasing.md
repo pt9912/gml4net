@@ -102,26 +102,31 @@ Release wird die zur Buildzeit aktuelle Version des Core-Pakets verwendet.
 
 ## Lokales Testen des Pack-Schritts
 
+**Wichtig:** Immer `--target artifacts` verwenden (nicht `--target pack`).
+Der `artifacts`-Stage basiert auf `FROM scratch` und enthaelt nur die
+`.nupkg`-Dateien. Der `pack`-Stage wuerde das gesamte SDK-Dateisystem
+(~1 GB) exportieren.
+
 ```bash
 # Beide Pakete bauen
-docker buildx build --target pack \
+docker buildx build --target artifacts \
   --build-arg PACKAGE_VERSION=0.1.0 \
   -o type=local,dest=./artifacts .
 
 # Nur Core-Paket bauen
-docker buildx build --target pack \
+docker buildx build --target artifacts \
   --build-arg PACK_TARGET=src/Gml4Net/Gml4Net.csproj \
   --build-arg PACKAGE_VERSION=0.1.0 \
   -o type=local,dest=./artifacts .
 
 # Nur I/O-Paket bauen
-docker buildx build --target pack \
+docker buildx build --target artifacts \
   --build-arg PACK_TARGET=src/Gml4Net.IO/Gml4Net.IO.csproj \
   --build-arg PACKAGE_VERSION=0.1.0 \
   -o type=local,dest=./artifacts .
 ```
 
-Die `.nupkg`-Dateien landen im `./artifacts/`-Verzeichnis.
+Die `.nupkg`-Dateien landen im `./artifacts/`-Verzeichnis (wenige KB).
 
 ## Checkliste vor einem Release
 
