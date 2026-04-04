@@ -25,6 +25,7 @@ publish/
 ## Build results
 [Dd]ebug/
 [Rr]elease/
+artifacts/
 x64/
 x86/
 [Ww][Ii][Nn]32/
