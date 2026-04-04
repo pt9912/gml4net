@@ -203,6 +203,107 @@ public class KmlBuilderTests
         kml.Name.LocalName.Should().Be("MultiGeometry");
     }
 
+    // ---- Null guards ----
+
+    [Fact]
+    public void Geometry_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => KmlBuilder.Geometry(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Feature_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => KmlBuilder.Feature(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void FeatureCollection_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => KmlBuilder.FeatureCollection(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    // ---- Edge cases ----
+
+    [Fact]
+    public void Feature_WithoutGeometry_ReturnsPlacemarkWithoutGeometry()
+    {
+        var feature = new GmlFeature
+        {
+            Properties = new GmlPropertyBag(
+            [
+                new GmlPropertyEntry { Name = "note", Value = new GmlStringProperty { Value = "test" } }
+            ])
+        };
+        var kml = KmlBuilder.Feature(feature);
+
+        kml.Name.LocalName.Should().Be("Placemark");
+        kml.ToString().Should().NotContain("Point");
+        kml.ToString().Should().Contain("test");
+    }
+
+    [Fact]
+    public void Feature_WithoutId_OmitsNameElement()
+    {
+        var feature = new GmlFeature();
+        var kml = KmlBuilder.Feature(feature);
+
+        kml.Name.LocalName.Should().Be("Placemark");
+        kml.ToString().Should().NotContain("<kml:name");
+        kml.ToString().Should().NotContain("<name");
+    }
+
+    [Fact]
+    public void Feature_WithMultipleGeometries_WrapsInMultiGeometry()
+    {
+        var feature = new GmlFeature
+        {
+            Properties = new GmlPropertyBag(
+            [
+                new GmlPropertyEntry
+                {
+                    Name = "g1",
+                    Value = new GmlGeometryProperty { Geometry = new GmlPoint { Coordinate = new(1, 2) } }
+                },
+                new GmlPropertyEntry
+                {
+                    Name = "g2",
+                    Value = new GmlGeometryProperty { Geometry = new GmlPoint { Coordinate = new(3, 4) } }
+                }
+            ])
+        };
+        var kml = KmlBuilder.Feature(feature);
+
+        kml.ToString().Should().Contain("MultiGeometry");
+    }
+
+    [Fact]
+    public void Geometry_Envelope3D_PreservesZ()
+    {
+        var env = new GmlEnvelope
+        {
+            LowerCorner = new GmlCoordinate(0, 0, 100),
+            UpperCorner = new GmlCoordinate(10, 10, 200)
+        };
+        var kml = KmlBuilder.Geometry(env)!;
+
+        kml.ToString().Should().Contain(",100");
+        kml.ToString().Should().Contain(",200");
+    }
+
+    [Fact]
+    public void FeatureCollection_UsesDefaultNamespace()
+    {
+        var fc = new GmlFeatureCollection { Features = [] };
+        var kml = KmlBuilder.FeatureCollection(fc);
+
+        // Should use xmlns="..." not xmlns:kml="..."
+        kml.ToString().Should().Contain("xmlns=\"http://www.opengis.net/kml/2.2\"");
+    }
+
     // ---- Roundtrip ----
 
     [Fact]

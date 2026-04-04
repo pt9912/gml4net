@@ -53,7 +53,8 @@ public static class KmlBuilder
         if (feature.Id is not null)
             placemark.Add(new XElement(Kml + "name", feature.Id));
 
-        // Build description from properties
+        // Collect geometry and description from properties
+        var geometries = new List<XElement>();
         var descParts = new List<string>();
         foreach (var entry in feature.Properties.Entries)
         {
@@ -61,7 +62,7 @@ public static class KmlBuilder
             {
                 var kmlGeom = Geometry(gp.Geometry);
                 if (kmlGeom is not null)
-                    placemark.Add(kmlGeom);
+                    geometries.Add(kmlGeom);
             }
             else if (entry.Value is GmlStringProperty sp)
             {
@@ -71,7 +72,21 @@ public static class KmlBuilder
             {
                 descParts.Add($"{entry.Name}: {np.Value.ToString(CultureInfo.InvariantCulture)}");
             }
+            else if (entry.Value is GmlNestedProperty)
+            {
+                descParts.Add($"{entry.Name}: [nested]");
+            }
+            else if (entry.Value is GmlRawXmlProperty raw)
+            {
+                descParts.Add($"{entry.Name}: {raw.XmlContent}");
+            }
         }
+
+        // KML allows only one geometry child per Placemark; wrap multiples in MultiGeometry
+        if (geometries.Count == 1)
+            placemark.Add(geometries[0]);
+        else if (geometries.Count > 1)
+            placemark.Add(BuildMultiGeometry(geometries.ToArray()));
 
         if (descParts.Count > 0)
             placemark.Add(new XElement(Kml + "description", string.Join("\n", descParts)));
@@ -92,9 +107,7 @@ public static class KmlBuilder
         foreach (var f in fc.Features)
             document.Add(Feature(f));
 
-        return new XElement(Kml + "kml",
-            new XAttribute(XNamespace.Xmlns + "kml", Kml.NamespaceName),
-            document);
+        return new XElement(Kml + "kml", document);
     }
 
     /// <summary>
@@ -157,7 +170,7 @@ public static class KmlBuilder
 
     // ---- Formatting ----
 
-    /// <summary>Formats a coordinate as KML "lon,lat[,alt]".</summary>
+    /// <summary>Formats a coordinate as KML "lon,lat[,alt]". M-ordinate is not supported by KML 2.2 and is omitted.</summary>
     private static string FormatCoord(GmlCoordinate c) =>
         c.Z.HasValue
             ? $"{F(c.X)},{F(c.Y)},{F(c.Z.Value)}"

@@ -184,10 +184,109 @@ public class CsvBuilderTests
         };
 
         var csv = CsvBuilder.FeatureCollection(fc);
-        var lines = csv.Trim().Split('\n');
+        var lines = csv.TrimEnd().Split("\r\n");
 
-        lines[0].Trim().Should().Be("a,b");
-        lines[2].Trim().Should().Be("3,"); // missing b
+        lines[0].Should().Be("a,b");
+        lines[2].Should().Be("3,"); // missing b
+    }
+
+    // ---- Null guard ----
+
+    [Fact]
+    public void FeatureCollection_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => CsvBuilder.FeatureCollection(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    // ---- Polygon WKT escaping (contains commas) ----
+
+    [Fact]
+    public void FeatureCollection_WithPolygonGeometry_EscapesWktCommas()
+    {
+        var fc = new GmlFeatureCollection
+        {
+            Features =
+            [
+                new GmlFeature
+                {
+                    Properties = new GmlPropertyBag(
+                    [
+                        new GmlPropertyEntry { Name = "name", Value = new GmlStringProperty { Value = "area" } },
+                        new GmlPropertyEntry
+                        {
+                            Name = "geom",
+                            Value = new GmlGeometryProperty
+                            {
+                                Geometry = new GmlPolygon
+                                {
+                                    Exterior = new GmlLinearRing
+                                    {
+                                        Coordinates = [new(0, 0), new(1, 0), new(1, 1), new(0, 0)]
+                                    }
+                                }
+                            }
+                        }
+                    ])
+                }
+            ]
+        };
+
+        var csv = CsvBuilder.FeatureCollection(fc);
+
+        // POLYGON WKT contains commas, so it must be quoted
+        csv.Should().Contain("\"POLYGON ((0 0, 1 0, 1 1, 0 0))\"");
+    }
+
+    // ---- Newline in value ----
+
+    [Fact]
+    public void FeatureCollection_WithNewlineInValue_EscapesCorrectly()
+    {
+        var fc = new GmlFeatureCollection
+        {
+            Features =
+            [
+                new GmlFeature
+                {
+                    Properties = new GmlPropertyBag(
+                    [
+                        new GmlPropertyEntry { Name = "note", Value = new GmlStringProperty { Value = "line1\nline2" } }
+                    ])
+                }
+            ]
+        };
+
+        var csv = CsvBuilder.FeatureCollection(fc);
+
+        csv.Should().Contain("\"line1\nline2\"");
+    }
+
+    // ---- CRLF line endings ----
+
+    [Fact]
+    public void FeatureCollection_UsesCrlfLineEndings()
+    {
+        var fc = new GmlFeatureCollection
+        {
+            Features =
+            [
+                new GmlFeature
+                {
+                    Properties = new GmlPropertyBag(
+                    [
+                        new GmlPropertyEntry { Name = "x", Value = new GmlStringProperty { Value = "1" } }
+                    ])
+                }
+            ]
+        };
+
+        var csv = CsvBuilder.FeatureCollection(fc);
+
+        csv.Should().Contain("\r\n");
+        // Should not have bare \n without preceding \r (except inside quoted fields)
+        var withoutQuoted = csv.Replace("\"line1\nline2\"", ""); // not relevant here
+        withoutQuoted.Replace("\r\n", "").Should().NotContain("\n");
     }
 
     // ---- Roundtrip ----
