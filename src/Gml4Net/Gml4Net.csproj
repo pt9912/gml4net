@@ -6,10 +6,15 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
     <PackageId>Gml4Net</PackageId>
-    <Description>A .NET library for parsing Geography Markup Language (GML) documents</Description>
+    <Authors>pt9912</Authors>
+    <Copyright>Copyright (c) 2026 pt9912</Copyright>
+    <Description>A .NET library for parsing Geography Markup Language (GML) documents. Supports GML 2-3.3, GeoJSON/WKT/KML/CSV export, OWS/WCS integration, and streaming for large documents.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>gml;geography;xml;ogc;gis;geojson;wkt</PackageTags>
+    <PackageTags>gml;geography;xml;ogc;gis;geojson;wkt;kml;wcs;wfs;parsing;streaming</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/pt9912/gml4net</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/pt9912/gml4net</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>

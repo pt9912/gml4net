@@ -6,10 +6,15 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
     <PackageId>Gml4Net.IO</PackageId>
-    <Description>File and HTTP I/O for the Gml4Net GML parsing library</Description>
+    <Authors>pt9912</Authors>
+    <Copyright>Copyright (c) 2026 pt9912</Copyright>
+    <Description>File and HTTP I/O for the Gml4Net GML parsing library. Provides file parsing, URL fetching with OWS exception detection, and streaming feature extraction from large WFS documents.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>gml;geography;xml;ogc;gis;io;http</PackageTags>
+    <PackageTags>gml;geography;xml;ogc;gis;io;http;wfs;streaming</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/pt9912/gml4net</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/pt9912/gml4net</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>
