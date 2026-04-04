@@ -71,9 +71,9 @@ Stufe 1 baut direkt auf `GmlFeatureStreamParser` auf und nutzt dessen
 
 Der Parser erzeugt nicht nur Modellobjekte, sondern kann optional Parser-Ereignisse an einen Sink oder Writer liefern.
 
-Zwei Ebenen sind sinnvoll:
+Drei Stufen sind sinnvoll, die aufeinander aufbauen:
 
-### 1. Feature-Sink auf Modellniveau
+### Stufe 1: Feature-Sink auf Modellniveau
 
 Dies ist der kleinere Einstieg. Der Parser liefert pro erkanntem Feature ein bereits gebautes `GmlFeature`, aber nie eine komplette Collection.
 
@@ -101,10 +101,14 @@ Nachteil:
 - pro Feature weiterhin Objektmaterialisierung
 - noch nicht optimal fuer maximale Performance
 
-### 2. Echte Event-Writer unterhalb des Modells
+### Stufe 2 und 3: Feature-Writer und Event-Sink
 
-Dies ist die moegliche spaetere Ausbaustufe fuer maximale Effizienz. Der
-Parser sendet strukturierte Ereignisse direkt an einen Writer. Im Gegensatz
+Stufe 2 fuehrt spezialisierte Writer ein, die `GmlFeature`-Objekte direkt
+in Zielformate schreiben (siehe Einfuehrungsstrategie Stufe 2 weiter unten).
+
+Stufe 3 ist die moegliche spaetere Ausbaustufe fuer maximale Effizienz:
+
+Der Parser sendet strukturierte Ereignisse direkt an einen Writer. Im Gegensatz
 zum Feature-Sink liefert dieser Pfad keine fertigen `GmlGeometry`- oder
 `GmlFeature`-Objekte mehr. Wichtig ist dabei, dass die Geometriestruktur
 vollstaendig rekonstruiert werden kann, also nicht nur rohe Koordinaten,
@@ -123,7 +127,9 @@ public interface IGmlEventSink
     ValueTask OnCoordinatesAsync(ReadOnlyMemory<GmlCoordinate> coordinates, CancellationToken ct = default);
     ValueTask OnEndGeometryPartAsync(string partKind, CancellationToken ct = default);
     ValueTask OnEndGeometryAsync(CancellationToken ct = default);
-    ValueTask OnPropertyScalarAsync(string name, object? value, CancellationToken ct = default);
+    ValueTask OnPropertyStringAsync(string name, string value, CancellationToken ct = default);
+    ValueTask OnPropertyNumericAsync(string name, double value, CancellationToken ct = default);
+    ValueTask OnPropertyNullAsync(string name, CancellationToken ct = default);
     ValueTask OnPropertyRawXmlAsync(string name, string xml, CancellationToken ct = default);
     ValueTask OnEndFeatureAsync(CancellationToken ct = default);
     ValueTask OnEndFeatureCollectionAsync(CancellationToken ct = default);
@@ -178,7 +184,7 @@ Diese Writer implementieren `IGmlFeatureWriter` und schreiben direkt in
 einen `Stream`, `PipeWriter` oder `Utf8JsonWriter`.
 
 ```csharp
-public interface IGmlFeatureWriter
+public interface IGmlFeatureWriter : IAsyncDisposable
 {
     ValueTask WriteStartAsync(CancellationToken ct = default);
     ValueTask WriteFeatureAsync(GmlFeature feature, CancellationToken ct = default);
