@@ -94,22 +94,36 @@ public static class GmlFeatureStreamParser
             }
             else if (IsFeatureMembersElement(reader))
             {
-                // featureMembers (plural): read the entire element as XElement,
-                // then iterate children via DOM. This avoids XmlReader state issues
-                // with ReadSubtree losing namespace context.
-                var membersEl = (XElement)await XNode.ReadFromAsync(reader, ct).ConfigureAwait(false);
-                var issues = new List<GmlParseIssue>();
-                foreach (var child in membersEl.Elements())
-                {
-                    ct.ThrowIfCancellationRequested();
-                    if (XmlHelpers.IsGmlNamespace(child.Name.NamespaceName)
-                        || XmlHelpers.IsWfsNamespace(child.Name.NamespaceName))
-                        continue;
+                // featureMembers (plural): children are feature elements directly.
+                // Iterate with forward-only reader keeping memory constant.
+                // Key: after XNode.ReadFromAsync the reader is already on the next
+                // node, so we must NOT call ReadAsync again before checking it.
+                var membersDepth = reader.Depth;
+                var alreadyPositioned = false;
 
-                    var effectiveVersion = XmlHelpers.DetectVersion(child, version);
-                    var feature = FeatureParser.ParseFeature(child, effectiveVersion, issues);
-                    if (feature is not null)
-                        yield return feature;
+                while (alreadyPositioned || await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    alreadyPositioned = false;
+                    ct.ThrowIfCancellationRequested();
+
+                    // End of featureMembers
+                    if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == membersDepth)
+                        break;
+
+                    if (reader.NodeType == XmlNodeType.Element
+                        && reader.Depth == membersDepth + 1
+                        && !IsGmlOrWfsElement(reader))
+                    {
+                        var featureEl = (XElement)await XNode.ReadFromAsync(reader, ct).ConfigureAwait(false);
+                        var effectiveVersion = XmlHelpers.DetectVersion(featureEl, version);
+                        var issues = new List<GmlParseIssue>();
+                        var feature = FeatureParser.ParseFeature(featureEl, effectiveVersion, issues);
+                        if (feature is not null)
+                            yield return feature;
+
+                        // ReadFromAsync positioned the reader on the next node already
+                        alreadyPositioned = true;
+                    }
                 }
             }
         }
