@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text;
 using System.Xml.Linq;
 using Gml4Net.Parser;
 
@@ -82,7 +80,7 @@ public sealed class WcsRequestBuilder
     public WcsRequestBuilder(string baseUrl, WcsVersion version = WcsVersion.V2_0_1)
     {
         ArgumentNullException.ThrowIfNull(baseUrl);
-        _baseUrl = baseUrl.TrimEnd('?', '&');
+        _baseUrl = baseUrl.TrimEnd('&');
         _version = version;
     }
 

@@ -216,4 +216,13 @@ public class WcsCapabilitiesParserTests
         caps.Coverages[0].CoverageId.Should().Be("dem_legacy");
         caps.Coverages[0].Bbox.Should().Equal(5, 47, 15, 55);
     }
+
+    // ---- Null guard ----
+
+    [Fact]
+    public void Parse_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => WcsCapabilitiesParser.Parse(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
 }

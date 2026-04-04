@@ -348,7 +348,7 @@ public static class WcsCapabilitiesParser
             return (double[])[minX, minY, maxX, maxY];
         }
 
-        return [];
+        return null;
     }
 
     private static XElement? Child(XElement parent, string localName) =>

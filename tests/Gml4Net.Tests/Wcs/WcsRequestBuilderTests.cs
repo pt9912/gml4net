@@ -166,4 +166,63 @@ public class WcsRequestBuilderTests
 
         act.Should().Throw<NotSupportedException>();
     }
+
+    // ---- Null guards ----
+
+    [Fact]
+    public void Constructor_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => new WcsRequestBuilder(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void BuildGetCoverageUrl_WithNull_ThrowsArgumentNullException()
+    {
+        var builder = new WcsRequestBuilder("https://example.com/wcs");
+        var act = () => builder.BuildGetCoverageUrl(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void BuildGetCoverageXml_WithNull_ThrowsArgumentNullException()
+    {
+        var builder = new WcsRequestBuilder("https://example.com/wcs");
+        var act = () => builder.BuildGetCoverageXml(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    // ---- V1_1_1 and V1_1_2 ----
+
+    [Fact]
+    public void BuildGetCoverageUrl_V1_1_1_UsesIdentifierParam()
+    {
+        var builder = new WcsRequestBuilder("https://example.com/wcs", WcsVersion.V1_1_1);
+        var url = builder.BuildGetCoverageUrl(new WcsGetCoverageOptions { CoverageId = "test" });
+
+        url.Should().Contain("identifier=test");
+        url.Should().Contain("version=1.1.1");
+    }
+
+    [Fact]
+    public void BuildGetCoverageUrl_V1_1_2_UsesIdentifierParam()
+    {
+        var builder = new WcsRequestBuilder("https://example.com/wcs", WcsVersion.V1_1_2);
+        var url = builder.BuildGetCoverageUrl(new WcsGetCoverageOptions { CoverageId = "test" });
+
+        url.Should().Contain("identifier=test");
+        url.Should().Contain("version=1.1.2");
+    }
+
+    // ---- Base URL edge case: trailing ? only ----
+
+    [Fact]
+    public void BuildGetCoverageUrl_BaseUrlWithTrailingQuestionMark_UsesAmpersand()
+    {
+        var builder = new WcsRequestBuilder("https://example.com/wcs?");
+        var url = builder.BuildGetCoverageUrl(new WcsGetCoverageOptions { CoverageId = "dem" });
+
+        url.Should().StartWith("https://example.com/wcs?");
+        url.Should().Contain("&service=WCS");
+    }
 }

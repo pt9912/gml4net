@@ -122,4 +122,20 @@ public class OwsExceptionTests
         report!.Exceptions.Should().ContainSingle();
         report.Exceptions[0].ExceptionCode.Should().Be("NoApplicableCode");
     }
+
+    // ---- Null guards ----
+
+    [Fact]
+    public void IsOwsExceptionReport_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => OwsExceptionParser.IsOwsExceptionReport(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Parse_WithNull_ThrowsArgumentNullException()
+    {
+        var act = () => OwsExceptionParser.Parse(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
 }
