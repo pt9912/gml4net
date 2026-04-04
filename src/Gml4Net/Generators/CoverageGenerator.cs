@@ -73,7 +73,7 @@ public static class CoverageGenerator
         var root = CreateCoverageRoot("ReferenceableGridCoverage", coverage);
 
         var domainSet = new XElement(Gml + "domainSet",
-            GenerateGrid(coverage.DomainSet));
+            GenerateGrid(coverage.DomainSet, "ReferenceableGrid"));
         root.Add(domainSet);
 
         AddRangeSet(root, coverage);
@@ -133,9 +133,9 @@ public static class CoverageGenerator
     }
 
     /// <summary>Generates a gml:Grid element with limits and optional axis labels.</summary>
-    private static XElement GenerateGrid(GmlGrid grid)
+    private static XElement GenerateGrid(GmlGrid grid, string localName = "Grid")
     {
-        var gridEl = new XElement(Gml + "Grid",
+        var gridEl = new XElement(Gml + localName,
             new XAttribute("dimension", grid.Dimension));
 
         if (grid.AxisLabels.Count > 0)

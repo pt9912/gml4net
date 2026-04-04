@@ -79,7 +79,7 @@ public static class GeoTiffUtils
             double f = grid.Origin.Y;             // y-origin
 
             transform = (double[])[a, b, c, d, e, f];
-            resolution = (double[])[Math.Abs(a), Math.Abs(e)];
+            resolution = (double[])[Math.Sqrt(a * a + b * b), Math.Sqrt(d * d + e * e)];
         }
 
         IReadOnlyList<double>? bbox = null;

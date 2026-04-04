@@ -243,6 +243,18 @@ internal static class CoverageParser
         var limits = ParseGridEnvelope(gridEnvEl, issues);
         if (limits is null) return null;
 
+        if (limits.Low.Count != dimension || limits.High.Count != dimension)
+        {
+            issues.Add(new GmlParseIssue
+            {
+                Severity = GmlIssueSeverity.Error,
+                Code = "invalid_grid_bounds_dimension",
+                Message = $"GridEnvelope bounds do not match declared dimension {dimension}",
+                Location = element.Name.LocalName
+            });
+            return null;
+        }
+
         var axisLabelsAttr = element.Attribute("axisLabels");
         var axisLabels = axisLabelsAttr is not null
             ? axisLabelsAttr.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList()
@@ -264,39 +276,54 @@ internal static class CoverageParser
 
         var srsName = XmlHelpers.GetSrsName(element);
 
-        // Origin: gml:origin/gml:Point/gml:pos
         var originEl = XmlHelpers.FindGmlChild(element, "origin");
-        GmlCoordinate origin = new(0, 0);
-        if (originEl is not null)
+        if (originEl is null)
         {
-            var pointEl = XmlHelpers.FindGmlChild(originEl, "Point");
-            if (pointEl is not null)
+            issues.Add(new GmlParseIssue
             {
-                var posEl = XmlHelpers.FindGmlChild(pointEl, "pos");
-                if (posEl is not null)
-                    origin = XmlHelpers.ParsePos(posEl.Value, issues: issues);
-            }
-            else
-            {
-                // Some documents put pos directly in origin
-                var posEl = XmlHelpers.FindGmlChild(originEl, "pos");
-                if (posEl is not null)
-                    origin = XmlHelpers.ParsePos(posEl.Value, issues: issues);
-            }
+                Severity = GmlIssueSeverity.Error,
+                Code = "missing_origin",
+                Message = "RectifiedGrid has no origin element",
+                Location = element.Name.LocalName
+            });
+            return null;
         }
 
-        // Offset vectors
+        var origin = ParseRequiredOrigin(originEl, issues);
+        if (origin is null) return null;
+
         var offsetVectors = new List<IReadOnlyList<double>>();
         foreach (var ovEl in XmlHelpers.FindGmlChildren(element, "offsetVector"))
         {
-            var parts = ovEl.Value.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            var values = new List<double>(parts.Length);
-            foreach (var part in parts)
+            var values = ParseDoubleListStrict(ovEl.Value, "offsetVector", issues);
+            if (values is null)
+                return null;
+
+            if (values.Count != baseGrid.Dimension)
             {
-                if (double.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out var val))
-                    values.Add(val);
+                issues.Add(new GmlParseIssue
+                {
+                    Severity = GmlIssueSeverity.Error,
+                    Code = "invalid_offset_vector",
+                    Message = $"offsetVector length {values.Count} does not match declared dimension {baseGrid.Dimension}",
+                    Location = element.Name.LocalName
+                });
+                return null;
             }
+
             offsetVectors.Add(values);
+        }
+
+        if (offsetVectors.Count < baseGrid.Dimension)
+        {
+            issues.Add(new GmlParseIssue
+            {
+                Severity = GmlIssueSeverity.Error,
+                Code = "missing_offset_vectors",
+                Message = $"RectifiedGrid requires at least {baseGrid.Dimension} offset vectors",
+                Location = element.Name.LocalName
+            });
+            return null;
         }
 
         return new GmlRectifiedGrid
@@ -305,7 +332,7 @@ internal static class CoverageParser
             Limits = baseGrid.Limits,
             AxisLabels = baseGrid.AxisLabels,
             SrsName = srsName,
-            Origin = origin,
+            Origin = origin.Value,
             OffsetVectors = offsetVectors
         };
     }
@@ -328,8 +355,22 @@ internal static class CoverageParser
             return null;
         }
 
-        var low = ParseIntList(lowEl.Value);
-        var high = ParseIntList(highEl.Value);
+        var low = ParseIntListStrict(lowEl.Value, "low", issues);
+        var high = ParseIntListStrict(highEl.Value, "high", issues);
+        if (low is null || high is null)
+            return null;
+
+        if (low.Count != high.Count)
+        {
+            issues.Add(new GmlParseIssue
+            {
+                Severity = GmlIssueSeverity.Error,
+                Code = "invalid_grid_bounds",
+                Message = "GridEnvelope low/high bounds have different dimensions",
+                Location = "GridEnvelope"
+            });
+            return null;
+        }
 
         return new GmlGridEnvelope { Low = low, High = high };
     }
@@ -438,15 +479,111 @@ internal static class CoverageParser
     }
 
     /// <summary>Parses a whitespace-separated string of integers into a list.</summary>
-    private static IReadOnlyList<int> ParseIntList(string text)
+    private static GmlCoordinate? ParseRequiredOrigin(XElement originEl, List<GmlParseIssue> issues)
+    {
+        var pointEl = XmlHelpers.FindGmlChild(originEl, "Point");
+        var posEl = pointEl is not null
+            ? XmlHelpers.FindGmlChild(pointEl, "pos")
+            : XmlHelpers.FindGmlChild(originEl, "pos");
+
+        if (posEl is null)
+        {
+            issues.Add(new GmlParseIssue
+            {
+                Severity = GmlIssueSeverity.Error,
+                Code = "missing_origin",
+                Message = "RectifiedGrid origin has no gml:pos value",
+                Location = "origin"
+            });
+            return null;
+        }
+
+        var parts = posEl.Value.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+        {
+            issues.Add(new GmlParseIssue
+            {
+                Severity = GmlIssueSeverity.Error,
+                Code = "invalid_origin",
+                Message = "RectifiedGrid origin must contain at least X and Y ordinates",
+                Location = "origin"
+            });
+            return null;
+        }
+
+        var beforeIssueCount = issues.Count;
+        var origin = XmlHelpers.ParsePos(posEl.Value, issues: issues);
+        return issues.Count > beforeIssueCount ? null : origin;
+    }
+
+    private static IReadOnlyList<int>? ParseIntListStrict(string text, string location, List<GmlParseIssue> issues)
     {
         var parts = text.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+        {
+            issues.Add(new GmlParseIssue
+            {
+                Severity = GmlIssueSeverity.Error,
+                Code = "invalid_grid_bounds",
+                Message = $"GridEnvelope {location} is empty",
+                Location = "GridEnvelope"
+            });
+            return null;
+        }
+
         var result = new List<int>(parts.Length);
         foreach (var part in parts)
         {
-            if (int.TryParse(part, out var val))
-                result.Add(val);
+            if (!int.TryParse(part, out var val))
+            {
+                issues.Add(new GmlParseIssue
+                {
+                    Severity = GmlIssueSeverity.Error,
+                    Code = "invalid_grid_bounds",
+                    Message = $"Cannot parse GridEnvelope {location} value '{part}'",
+                    Location = "GridEnvelope"
+                });
+                return null;
+            }
+
+            result.Add(val);
         }
+        return result;
+    }
+
+    private static IReadOnlyList<double>? ParseDoubleListStrict(string text, string location, List<GmlParseIssue> issues)
+    {
+        var parts = text.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+        {
+            issues.Add(new GmlParseIssue
+            {
+                Severity = GmlIssueSeverity.Error,
+                Code = "invalid_offset_vector",
+                Message = $"{location} is empty",
+                Location = location
+            });
+            return null;
+        }
+
+        var result = new List<double>(parts.Length);
+        foreach (var part in parts)
+        {
+            if (!double.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+            {
+                issues.Add(new GmlParseIssue
+                {
+                    Severity = GmlIssueSeverity.Error,
+                    Code = "invalid_offset_vector",
+                    Message = $"Cannot parse {location} value '{part}'",
+                    Location = location
+                });
+                return null;
+            }
+
+            result.Add(value);
+        }
+
         return result;
     }
 }

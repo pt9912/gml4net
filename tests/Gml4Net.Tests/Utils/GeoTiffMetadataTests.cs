@@ -149,6 +149,27 @@ public class GeoTiffMetadataTests
         meta.Bands.Should().BeNull();
     }
 
+    [Fact]
+    public void ExtractMetadata_WithRotatedOffsetVectors_UsesVectorLengthForResolution()
+    {
+        var coverage = new GmlRectifiedGridCoverage
+        {
+            DomainSet = new GmlRectifiedGrid
+            {
+                Dimension = 2,
+                Limits = new GmlGridEnvelope { Low = [0, 0], High = [9, 9] },
+                Origin = new GmlCoordinate(0, 0),
+                OffsetVectors = [new double[] { 3, 4 }, new double[] { 5, 12 }]
+            }
+        };
+
+        var meta = GeoTiffUtils.ExtractMetadata(coverage);
+
+        meta.Should().NotBeNull();
+        meta!.Resolution.Should().Equal(5, 13);
+        meta.Transform.Should().Equal(3, 4, 0, 5, 12, 0);
+    }
+
     private static GmlRectifiedGridCoverage CreateCoverage() => new()
     {
         BoundedBy = new GmlEnvelope

@@ -295,4 +295,274 @@ public class CoverageParserTests
         cov.DomainSet.Origin.X.Should().Be(5);
         cov.DomainSet.Origin.Y.Should().Be(10);
     }
+
+    [Fact]
+    public void ParseXmlString_WithRectifiedGridMissingOrigin_ReturnsError()
+    {
+        var xml = """
+            <gml:RectifiedGridCoverage xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:domainSet>
+                    <gml:RectifiedGrid dimension="2">
+                        <gml:limits>
+                            <gml:GridEnvelope>
+                                <gml:low>0 0</gml:low>
+                                <gml:high>9 9</gml:high>
+                            </gml:GridEnvelope>
+                        </gml:limits>
+                        <gml:offsetVector>1 0</gml:offsetVector>
+                        <gml:offsetVector>0 1</gml:offsetVector>
+                    </gml:RectifiedGrid>
+                </gml:domainSet>
+            </gml:RectifiedGridCoverage>
+            """;
+
+        var result = GmlParser.ParseXmlString(xml);
+
+        result.HasErrors.Should().BeTrue();
+        result.Issues.Should().Contain(i => i.Code == "missing_origin");
+    }
+
+    [Fact]
+    public void ParseXmlString_WithRectifiedGridMissingOffsetVectors_ReturnsError()
+    {
+        var xml = """
+            <gml:RectifiedGridCoverage xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:domainSet>
+                    <gml:RectifiedGrid dimension="2">
+                        <gml:limits>
+                            <gml:GridEnvelope>
+                                <gml:low>0 0</gml:low>
+                                <gml:high>9 9</gml:high>
+                            </gml:GridEnvelope>
+                        </gml:limits>
+                        <gml:origin>
+                            <gml:Point><gml:pos>0 0</gml:pos></gml:Point>
+                        </gml:origin>
+                    </gml:RectifiedGrid>
+                </gml:domainSet>
+            </gml:RectifiedGridCoverage>
+            """;
+
+        var result = GmlParser.ParseXmlString(xml);
+
+        result.HasErrors.Should().BeTrue();
+        result.Issues.Should().Contain(i => i.Code == "missing_offset_vectors");
+    }
+
+    [Fact]
+    public void ParseXmlString_WithInvalidGridEnvelopeValue_ReturnsError()
+    {
+        var xml = """
+            <gml:GridCoverage xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:domainSet>
+                    <gml:Grid dimension="2">
+                        <gml:limits>
+                            <gml:GridEnvelope>
+                                <gml:low>0 a</gml:low>
+                                <gml:high>9 9</gml:high>
+                            </gml:GridEnvelope>
+                        </gml:limits>
+                    </gml:Grid>
+                </gml:domainSet>
+            </gml:GridCoverage>
+            """;
+
+        var result = GmlParser.ParseXmlString(xml);
+
+        result.HasErrors.Should().BeTrue();
+        result.Issues.Should().Contain(i => i.Code == "invalid_grid_bounds");
+    }
+
+    [Fact]
+    public void ParseXmlString_WithGridEnvelopeDimensionMismatch_ReturnsError()
+    {
+        var xml = """
+            <gml:GridCoverage xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:domainSet>
+                    <gml:Grid dimension="2">
+                        <gml:limits>
+                            <gml:GridEnvelope>
+                                <gml:low>0 0 0</gml:low>
+                                <gml:high>9 9 9</gml:high>
+                            </gml:GridEnvelope>
+                        </gml:limits>
+                    </gml:Grid>
+                </gml:domainSet>
+            </gml:GridCoverage>
+            """;
+
+        var result = GmlParser.ParseXmlString(xml);
+
+        result.HasErrors.Should().BeTrue();
+        result.Issues.Should().Contain(i => i.Code == "invalid_grid_bounds_dimension");
+    }
+
+    [Fact]
+    public void ParseXmlString_WithGridEnvelopeLowHighDimensionMismatch_ReturnsError()
+    {
+        var xml = """
+            <gml:GridCoverage xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:domainSet>
+                    <gml:Grid dimension="2">
+                        <gml:limits>
+                            <gml:GridEnvelope>
+                                <gml:low>0 0</gml:low>
+                                <gml:high>9 9 9</gml:high>
+                            </gml:GridEnvelope>
+                        </gml:limits>
+                    </gml:Grid>
+                </gml:domainSet>
+            </gml:GridCoverage>
+            """;
+
+        var result = GmlParser.ParseXmlString(xml);
+
+        result.HasErrors.Should().BeTrue();
+        result.Issues.Should().Contain(i => i.Code == "invalid_grid_bounds");
+    }
+
+    [Fact]
+    public void ParseXmlString_WithRectifiedGridOriginMissingPos_ReturnsError()
+    {
+        var xml = """
+            <gml:RectifiedGridCoverage xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:domainSet>
+                    <gml:RectifiedGrid dimension="2">
+                        <gml:limits>
+                            <gml:GridEnvelope>
+                                <gml:low>0 0</gml:low>
+                                <gml:high>9 9</gml:high>
+                            </gml:GridEnvelope>
+                        </gml:limits>
+                        <gml:origin>
+                            <gml:Point />
+                        </gml:origin>
+                        <gml:offsetVector>1 0</gml:offsetVector>
+                        <gml:offsetVector>0 1</gml:offsetVector>
+                    </gml:RectifiedGrid>
+                </gml:domainSet>
+            </gml:RectifiedGridCoverage>
+            """;
+
+        var result = GmlParser.ParseXmlString(xml);
+
+        result.HasErrors.Should().BeTrue();
+        result.Issues.Should().Contain(i => i.Code == "missing_origin");
+    }
+
+    [Fact]
+    public void ParseXmlString_WithRectifiedGridOriginWithSingleOrdinate_ReturnsError()
+    {
+        var xml = """
+            <gml:RectifiedGridCoverage xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:domainSet>
+                    <gml:RectifiedGrid dimension="2">
+                        <gml:limits>
+                            <gml:GridEnvelope>
+                                <gml:low>0 0</gml:low>
+                                <gml:high>9 9</gml:high>
+                            </gml:GridEnvelope>
+                        </gml:limits>
+                        <gml:origin>
+                            <gml:pos>5</gml:pos>
+                        </gml:origin>
+                        <gml:offsetVector>1 0</gml:offsetVector>
+                        <gml:offsetVector>0 1</gml:offsetVector>
+                    </gml:RectifiedGrid>
+                </gml:domainSet>
+            </gml:RectifiedGridCoverage>
+            """;
+
+        var result = GmlParser.ParseXmlString(xml);
+
+        result.HasErrors.Should().BeTrue();
+        result.Issues.Should().Contain(i => i.Code == "invalid_origin");
+    }
+
+    [Fact]
+    public void ParseXmlString_WithRectifiedGridInvalidOffsetVectorValue_ReturnsError()
+    {
+        var xml = """
+            <gml:RectifiedGridCoverage xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:domainSet>
+                    <gml:RectifiedGrid dimension="2">
+                        <gml:limits>
+                            <gml:GridEnvelope>
+                                <gml:low>0 0</gml:low>
+                                <gml:high>9 9</gml:high>
+                            </gml:GridEnvelope>
+                        </gml:limits>
+                        <gml:origin>
+                            <gml:pos>0 0</gml:pos>
+                        </gml:origin>
+                        <gml:offsetVector>1 a</gml:offsetVector>
+                        <gml:offsetVector>0 1</gml:offsetVector>
+                    </gml:RectifiedGrid>
+                </gml:domainSet>
+            </gml:RectifiedGridCoverage>
+            """;
+
+        var result = GmlParser.ParseXmlString(xml);
+
+        result.HasErrors.Should().BeTrue();
+        result.Issues.Should().Contain(i => i.Code == "invalid_offset_vector");
+    }
+
+    [Fact]
+    public void ParseXmlString_WithRectifiedGridOffsetVectorDimensionMismatch_ReturnsError()
+    {
+        var xml = """
+            <gml:RectifiedGridCoverage xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:domainSet>
+                    <gml:RectifiedGrid dimension="2">
+                        <gml:limits>
+                            <gml:GridEnvelope>
+                                <gml:low>0 0</gml:low>
+                                <gml:high>9 9</gml:high>
+                            </gml:GridEnvelope>
+                        </gml:limits>
+                        <gml:origin>
+                            <gml:pos>0 0</gml:pos>
+                        </gml:origin>
+                        <gml:offsetVector>1 0 0</gml:offsetVector>
+                        <gml:offsetVector>0 1</gml:offsetVector>
+                    </gml:RectifiedGrid>
+                </gml:domainSet>
+            </gml:RectifiedGridCoverage>
+            """;
+
+        var result = GmlParser.ParseXmlString(xml);
+
+        result.HasErrors.Should().BeTrue();
+        result.Issues.Should().Contain(i => i.Code == "invalid_offset_vector");
+    }
+
+    [Fact]
+    public void ParseXmlString_WithEmptyOffsetVector_ReturnsError()
+    {
+        var xml = """
+            <gml:RectifiedGridCoverage xmlns:gml="http://www.opengis.net/gml/3.2">
+                <gml:domainSet>
+                    <gml:RectifiedGrid dimension="2">
+                        <gml:limits>
+                            <gml:GridEnvelope>
+                                <gml:low>0 0</gml:low>
+                                <gml:high>9 9</gml:high>
+                            </gml:GridEnvelope>
+                        </gml:limits>
+                        <gml:origin>
+                            <gml:pos>0 0</gml:pos>
+                        </gml:origin>
+                        <gml:offsetVector></gml:offsetVector>
+                        <gml:offsetVector>0 1</gml:offsetVector>
+                    </gml:RectifiedGrid>
+                </gml:domainSet>
+            </gml:RectifiedGridCoverage>
+            """;
+
+        var result = GmlParser.ParseXmlString(xml);
+
+        result.HasErrors.Should().BeTrue();
+        result.Issues.Should().Contain(i => i.Code == "invalid_offset_vector");
+    }
 }

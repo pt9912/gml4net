@@ -82,6 +82,25 @@ public class CoverageGeneratorTests
     }
 
     [Fact]
+    public void Generate_ReferenceableGridCoverage_UsesReferenceableGridElement()
+    {
+        var coverage = new GmlReferenceableGridCoverage
+        {
+            DomainSet = new GmlGrid
+            {
+                Dimension = 2,
+                Limits = new GmlGridEnvelope { Low = [0, 0], High = [9, 9] }
+            }
+        };
+
+        var xml = CoverageGenerator.Generate(coverage);
+
+        xml.Should().Contain("ReferenceableGrid");
+        xml.Should().NotContain("<gml:Grid ");
+        xml.Should().NotContain("<gml:Grid>");
+    }
+
+    [Fact]
     public void Generate_MultiPointCoverage_RoundtripParsesBack()
     {
         var coverage = new GmlMultiPointCoverage
