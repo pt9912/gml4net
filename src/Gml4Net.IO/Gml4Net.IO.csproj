@@ -9,7 +9,12 @@
     <Description>File and HTTP I/O for the Gml4Net GML parsing library</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>gml;geography;xml;ogc;gis;io;http</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Gml4Net\Gml4Net.csproj" />

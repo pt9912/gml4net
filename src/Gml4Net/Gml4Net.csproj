@@ -9,7 +9,12 @@
     <Description>A .NET library for parsing Geography Markup Language (GML) documents</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>gml;geography;xml;ogc;gis;geojson;wkt</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Gml4Net.IO" />
