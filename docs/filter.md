@@ -80,14 +80,19 @@ public readonly record struct StreamingProgress(
   - nicht als `FeaturesProcessed` gezaehlt
   - nicht als `FeaturesFailed` gezaehlt
   - als `FeaturesFiltered` gezaehlt
-- `FeaturesProcessed + FeaturesFailed + FeaturesFiltered` ergibt die Anzahl
-  aller erfolgreich geparsten Features (ohne fatale Parse-Fehler)
+- `FeaturesProcessed + FeaturesFailed + FeaturesFiltered` ergibt die
+  Gesamtzahl aller Feature-Ergebnisse, die der Streaming-Pfad verarbeitet hat
 - `Progress` meldet nach jedem Feature-Ergebnis (inkl. gefilterter Features)
   die kumulativen Zaehler
 - wirft der Filter selbst eine Exception, wird das Feature als fehlgeschlagen
   behandelt (nicht als gefiltert), und `OnError` wird aufgerufen
+- wirft der Filter `OperationCanceledException`, wird diese sofort propagiert
+  (nicht als Feature-Fehler gezaehlt)
 - `OnEnd` erhaelt den `StreamingResult` mit allen drei Zaehlern
 - wenn kein `Filter` gesetzt ist, aendert sich nichts am bisherigen Verhalten
+- der Filter arbeitet immer auf dem rohen `GmlFeature`, nicht auf dem
+  Builder-Output (`TFeature`); bei `StreamingGml.ParseAsync<builder>` wird
+  der Filter *vor* dem Builder ausgewertet
 
 ## Auswertungsreihenfolge
 
@@ -111,7 +116,9 @@ FeatureStreamItem
         |
         +-- Filter(feature) == false --> filtered++
         |
-        +-- Filter(feature) wirft Exception --> failed++, OnError
+        +-- Filter(feature) wirft OperationCanceledException --> propagiert sofort
+        |
+        +-- Filter(feature) wirft andere Exception --> failed++, OnError
 ```
 
 ## Im Batch-Pfad
@@ -133,7 +140,7 @@ var result = await StreamingGml.ParseAsync(
     feature => ProcessAsync(feature),
     options: new StreamingParserOptions
     {
-        Filter = f => f.Properties["status"]?.ToString() == "active"
+        Filter = f => f.Properties["status"] is GmlStringProperty { Value: "active" }
     });
 
 // result.FeaturesProcessed -- nur aktive Features
@@ -143,7 +150,7 @@ var result = await StreamingGml.ParseAsync(
 ### BBox-Clipping
 
 ```csharp
-var bbox = new Envelope(minX: 11.0, minY: 47.0, maxX: 12.0, maxY: 48.0);
+var (minX, minY, maxX, maxY) = (11.0, 47.0, 12.0, 48.0);
 
 var result = await StreamingGml.ParseAsync(
     stream,
@@ -151,19 +158,20 @@ var result = await StreamingGml.ParseAsync(
     feature => ProcessAsync(feature),
     options: new StreamingParserOptions
     {
-        Filter = f => HasGeometryInBBox(f, bbox)
+        Filter = f => HasPointInBBox(f, minX, minY, maxX, maxY)
     });
 
-static bool HasGeometryInBBox(GmlFeature feature, Envelope bbox)
+static bool HasPointInBBox(GmlFeature feature,
+    double minX, double minY, double maxX, double maxY)
 {
     foreach (var entry in feature.Properties)
     {
         if (entry.Value is GmlGeometryProperty gp
             && gp.Geometry is GmlPoint pt
-            && pt.Coordinate.X >= bbox.MinX
-            && pt.Coordinate.X <= bbox.MaxX
-            && pt.Coordinate.Y >= bbox.MinY
-            && pt.Coordinate.Y <= bbox.MaxY)
+            && pt.Coordinate.X >= minX
+            && pt.Coordinate.X <= maxX
+            && pt.Coordinate.Y >= minY
+            && pt.Coordinate.Y <= maxY)
             return true;
     }
     return false;
@@ -198,7 +206,7 @@ var result = await StreamingGml.ParseBatchesAsync(
     batchSize: 100,
     options: new StreamingParserOptions
     {
-        Filter = f => f.Properties.ContainsKey("geometry")
+        Filter = f => f.Properties.Any(e => e.Value is GmlGeometryProperty)
     });
 
 // Batches enthalten nur Features mit Geometrie
