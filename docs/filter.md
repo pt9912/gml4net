@@ -33,17 +33,12 @@ Siehe `src/Gml4Net/Parser/Streaming/StreamingParserOptions.cs`.
 
 Neues Property:
 
-```csharp
-/// <summary>
-/// Optional predicate that determines whether a successfully parsed feature
-/// should be emitted to the configured callback, batch, or sink.
-/// Features for which the predicate returns false are silently skipped
-/// and counted as filtered, not as processed or failed. If the parsed feature
-/// already carries non-fatal parser diagnostics, these diagnostics are still
-/// forwarded via the configured error callback.
-/// </summary>
-public Func<GmlFeature, bool>? Filter { get; init; }
-```
+- `Filter` vom Typ `Func<GmlFeature, bool>?`
+- entscheidet nach erfolgreichem Parsen, ob ein Feature an Callback, Batch oder
+  Sink weitergereicht wird
+- bei `false` wird das Feature als gefiltert gezaehlt
+- vorhandene nicht-fatale Parser-Diagnostik bleibt dabei ueber den
+  Fehlerkanal sichtbar
 
 ### StreamingResult
 
@@ -51,13 +46,9 @@ Siehe `src/Gml4Net/Parser/Streaming/StreamingResult.cs`.
 
 Neues Property:
 
-```csharp
-/// <summary>
-/// Number of features that were successfully parsed but excluded by the
-/// configured filter predicate.
-/// </summary>
-public int FeaturesFiltered { get; init; }
-```
+- `FeaturesFiltered`
+- zaehlt erfolgreich geparste Features, die durch den konfigurierten Filter
+  ausgeschlossen wurden
 
 ### StreamingProgress
 
@@ -65,12 +56,9 @@ Siehe `src/Gml4Net/Parser/Streaming/StreamingResult.cs`.
 
 Neuer Parameter:
 
-```csharp
-public readonly record struct StreamingProgress(
-    int FeaturesProcessed,
-    int FeaturesFailed,
-    int FeaturesFiltered);
-```
+- `StreamingProgress` enthaelt zusaetzlich `FeaturesFiltered`
+- Progress-Snapshots bestehen damit aus `FeaturesProcessed`,
+  `FeaturesFailed` und `FeaturesFiltered`
 
 ## Semantik
 
@@ -158,85 +146,33 @@ FeatureStreamItem
 
 ### Property-Filter
 
-```csharp
-var result = await StreamingGml.ParseAsync(
-    stream,
-    new GeoJsonBuilder(),
-    feature => ProcessAsync(feature),
-    options: new StreamingParserOptions
-    {
-        Filter = f => f.Properties.TryGetValue("status", out var v)
-                      && v is GmlStringProperty { Value: "active" }
-    });
-
-// result.FeaturesProcessed -- nur aktive Features
-// result.FeaturesFiltered  -- uebersprungene Features
-```
+Beispiel: Ein Property-Filter kann ueber `TryGetValue("status", out var v)`
+auf der Property-Bag arbeiten und nur Features mit einem
+`GmlStringProperty`-Wert `"active"` durchlassen. Im Result zaehlt
+`FeaturesProcessed` dann nur aktive Features, waehrend `FeaturesFiltered` die
+uebersprungenen Features enthaelt.
 
 ### BBox-Clipping
 
-```csharp
-var (minX, minY, maxX, maxY) = (11.0, 47.0, 12.0, 48.0);
-
-var result = await StreamingGml.ParseAsync(
-    stream,
-    new GeoJsonBuilder(),
-    feature => ProcessAsync(feature),
-    options: new StreamingParserOptions
-    {
-        Filter = f => HasPointInBBox(f, minX, minY, maxX, maxY)
-    });
-
-static bool HasPointInBBox(GmlFeature feature,
-    double minX, double minY, double maxX, double maxY)
-{
-    foreach (var entry in feature.Properties)
-    {
-        if (entry.Value is GmlGeometryProperty gp
-            && gp.Geometry is GmlPoint pt
-            && pt.Coordinate.X >= minX
-            && pt.Coordinate.X <= maxX
-            && pt.Coordinate.Y >= minY
-            && pt.Coordinate.Y <= maxY)
-            return true;
-    }
-    return false;
-}
-```
+Beispiel: Fuer einfaches BBox-Clipping kann der Filter die
+`GmlGeometryProperty`-Eintraege eines Features durchsuchen und ein Feature nur
+dann akzeptieren, wenn mindestens ein enthaltenes `GmlPoint` innerhalb der
+gewuenschten Bounding Box liegt.
 
 ### Kombiniert mit Fehlertoleranz
 
-```csharp
-var parser = new StreamingGmlParser(new StreamingParserOptions
-{
-    ErrorBehavior = StreamingErrorBehavior.Continue,
-    Filter = f => f.Id?.StartsWith("building.") == true
-});
-
-parser.OnFeature(f => InsertAsync(f));
-parser.OnError(e => Log.Warning(e.Exception, "Skipped"));
-
-var result = await parser.ParseAsync(stream);
-// result.FeaturesProcessed == 1200
-// result.FeaturesFailed    == 3
-// result.FeaturesFiltered  == 8500
-```
+Beispiel: Der direkte `StreamingGmlParser` kann mit
+`ErrorBehavior = Continue` und einem ID-basierten Filter kombiniert werden,
+etwa um nur Features mit einem Praefix wie `building.` weiterzuverarbeiten.
+Dabei koennen `OnFeature(...)` und `OnError(...)` parallel genutzt werden; im
+Result spiegeln `FeaturesProcessed`, `FeaturesFailed` und `FeaturesFiltered`
+anschliessend die Aufteilung wider.
 
 ### Batch mit Filter
 
-```csharp
-var result = await StreamingGml.ParseBatchesAsync(
-    stream,
-    new GeoJsonBuilder(),
-    batch => BulkInsertAsync(batch),
-    batchSize: 100,
-    options: new StreamingParserOptions
-    {
-        Filter = f => f.Properties.Any(e => e.Value is GmlGeometryProperty)
-    });
-
-// Batches enthalten nur Features mit Geometrie
-```
+Beispiel: Im Batch-Pfad kann ein Filter vor dem Batch-Buffer nur Features mit
+Geometrie durchlassen. Die resultierenden Batches enthalten dann ausschliesslich
+ungefilterte Features, und `batchSize` bezieht sich nur auf diese Teilmenge.
 
 ## Testfaelle
 
