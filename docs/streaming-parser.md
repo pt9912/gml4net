@@ -85,26 +85,7 @@ Namespace-/Ordner-Entscheidung:
 
 ### StreamingGmlParser
 
-```csharp
-namespace Gml4Net.Parser;
-
-/// <summary>
-/// Public streaming parser for large GML/WFS feature collections.
-/// Streams one feature at a time and invokes registered handlers immediately.
-/// </summary>
-public sealed class StreamingGmlParser
-{
-    public StreamingGmlParser(StreamingParserOptions? options = null);
-
-    public StreamingGmlParser OnFeature(Func<GmlFeature, ValueTask> callback);
-    public StreamingGmlParser OnError(Action<StreamingError> callback);
-    public StreamingGmlParser OnEnd(Action<StreamingResult> callback);
-
-    public Task<StreamingResult> ParseAsync(
-        Stream stream,
-        CancellationToken ct = default);
-}
-```
+Siehe `src/Gml4Net/Parser/Streaming/StreamingGmlParser.cs`.
 
 Vertragsregeln fuer `StreamingGmlParser`:
 
@@ -131,62 +112,11 @@ Vertragsregeln fuer `StreamingGmlParser`:
 
 ### StreamingParserOptions
 
-```csharp
-namespace Gml4Net.Parser;
+Siehe `src/Gml4Net/Parser/Streaming/StreamingParserOptions.cs`.
 
-public sealed class StreamingParserOptions
-{
-    /// <summary>
-    /// Behavior when parsing or processing a single feature fails.
-    /// Default: continue and emit error callback.
-    /// </summary>
-    public StreamingErrorBehavior ErrorBehavior { get; init; }
-        = StreamingErrorBehavior.Continue;
+### StreamingResult / StreamingProgress
 
-    /// <summary>
-    /// Optional progress reporting after each feature outcome
-    /// (success or failure).
-    /// </summary>
-    public IProgress<StreamingProgress>? Progress { get; init; }
-}
-
-public enum StreamingErrorBehavior
-{
-    Stop,
-    Continue
-}
-```
-
-### StreamingResult
-
-```csharp
-namespace Gml4Net.Parser;
-
-public sealed record StreamingResult
-{
-    /// <summary>
-    /// Number of features that were successfully processed and emitted to the
-    /// configured callback, batch, or sink.
-    /// </summary>
-    public int FeaturesProcessed { get; init; }
-
-    /// <summary>
-    /// Number of features that failed during parsing or downstream handling,
-    /// or were lost due to premature termination before delivery.
-    /// </summary>
-    public int FeaturesFailed { get; init; }
-}
-```
-
-### StreamingProgress
-
-```csharp
-namespace Gml4Net.Parser;
-
-public readonly record struct StreamingProgress(
-    int FeaturesProcessed,
-    int FeaturesFailed);
-```
+Siehe `src/Gml4Net/Parser/Streaming/StreamingResult.cs`.
 
 Zaehlersemantik:
 
@@ -212,17 +142,7 @@ Zaehlersemantik:
 
 ### StreamingError
 
-```csharp
-namespace Gml4Net.Parser;
-
-public sealed class StreamingError
-{
-    public Exception? Exception { get; init; }
-    public IReadOnlyList<GmlParseIssue> Issues { get; init; } = [];
-    public string? FeatureId { get; init; }
-    public bool CanContinue { get; init; }
-}
-```
+Siehe `src/Gml4Net/Parser/Streaming/StreamingError.cs`.
 
 ## Builder-Integration
 
@@ -233,36 +153,7 @@ diesem generischen Interface.
 Die oeffentliche Convenience-API akzeptiert bestehende `IBuilder`-Implementierungen
 direkt und reduziert sie intern auf den Feature-Fall:
 
-```csharp
-namespace Gml4Net.Parser;
-
-public static class StreamingGml
-{
-    public static Task<StreamingResult> ParseAsync<TGeometry, TFeature, TCollection>(
-        Stream stream,
-        IBuilder<TGeometry, TFeature, TCollection> builder,
-        Func<TFeature, ValueTask> onFeature,
-        Action<StreamingError>? onError = null,
-        StreamingParserOptions? options = null,
-        CancellationToken ct = default);
-
-    public static Task<StreamingResult> ParseBatchesAsync<TGeometry, TFeature, TCollection>(
-        Stream stream,
-        IBuilder<TGeometry, TFeature, TCollection> builder,
-        Func<IReadOnlyList<TFeature>, ValueTask> onBatch,
-        int batchSize = 100,
-        Action<StreamingError>? onError = null,
-        StreamingParserOptions? options = null,
-        CancellationToken ct = default);
-
-    public static Task<StreamingResult> ParseAsync(
-        Stream stream,
-        IFeatureSink sink,
-        Action<StreamingError>? onError = null,
-        StreamingParserOptions? options = null,
-        CancellationToken ct = default);
-}
-```
+Siehe `src/Gml4Net/Parser/Streaming/StreamingGml.cs`.
 
 Ein moeglicher interner `FeatureBuilderAdapter` bleibt ein
 Implementierungsdetail und muss nicht Teil der typischen Aufrufer-API sein.
@@ -275,18 +166,7 @@ bei `Continue` inspiziert oder geloggt werden, ohne auf den direkten
 Fuer Komponenten, die Features direkt schreiben oder persistieren, soll es
 zusaetzlich einen eigenen Sink-Vertrag geben:
 
-```csharp
-namespace Gml4Net.Interop;
-
-public interface IFeatureSink
-{
-    ValueTask WriteFeatureAsync(
-        GmlFeature feature,
-        CancellationToken ct = default);
-
-    ValueTask CompleteAsync(CancellationToken ct = default);
-}
-```
+Siehe `src/Gml4Net/Interop/IFeatureSink.cs`.
 
 Damit werden zwei Faelle klar getrennt, ohne die oeffentlichen Overloads auf
 zwei verschiedene `StreamingGml`-Klassen in unterschiedlichen Namespaces zu
@@ -329,31 +209,8 @@ Hinweis zur Sichtbarkeit: Die folgende Skizze zeigt das Zielbild mit internem
 Low-Level-Vertrag. Gegenueber dem aktuellen Stand waere die Umstellung von
 `public` auf `internal` bei `GmlFeatureStreamParser` ein Breaking Change.
 
-```csharp
-namespace Gml4Net.Parser.Streaming;
-
-internal static class GmlFeatureStreamParser
-{
-    internal static IAsyncEnumerable<GmlFeature> ParseAsync(
-        Stream stream,
-        CancellationToken ct = default);
-
-    internal static IAsyncEnumerable<FeatureStreamItem> ParseItemsAsync(
-        Stream stream,
-        CancellationToken ct = default);
-}
-
-internal sealed record FeatureStreamItem
-{
-    public GmlFeature? Feature { get; init; }
-    public IReadOnlyList<GmlParseIssue> Issues { get; init; } = [];
-    public Exception? Exception { get; init; }
-    public bool CanContinue { get; init; }
-
-    // "Success" means "a feature was produced", not "no diagnostics exist".
-    public bool IsSuccess => Feature is not null;
-}
-```
+Siehe `src/Gml4Net/Parser/Streaming/GmlFeatureStreamParser.cs` und
+`src/Gml4Net/Parser/Streaming/FeatureStreamItem.cs`.
 
 `ParseAsync(...)` bleibt als Convenience-API fuer erfolgreiche Features
 erhalten. `StreamingGmlParser` verwendet dagegen `ParseItemsAsync(...)`.

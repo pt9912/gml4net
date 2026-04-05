@@ -190,107 +190,9 @@ else if (result.Geometry is { } g)
 
 ### BuilderExtensions
 
-Die Dispatch-Logik (welche Builder-Methode fuer welchen Geometrietyp?) ist heute
-in jedem Builder separat implementiert (z.B. `GeoJsonBuilder.Geometry()`). Das
-wird als generische Extension-Method auf `IBuilder` zentralisiert und ist auch
-ohne den generischen Parser eigenstaendig nutzbar:
-
-```csharp
-namespace Gml4Net.Interop;
-
-public static class BuilderExtensions
-{
-    /// <summary>
-    /// Dispatcht eine GmlGeometry an die passende Builder-Methode.
-    /// </summary>
-    public static TGeometry? BuildGeometry<TGeometry, TFeature, TCollection>(
-        this IBuilder<TGeometry, TFeature, TCollection> builder,
-        GmlGeometry geometry)
-    {
-        return geometry switch
-        {
-            GmlPoint p              => builder.BuildPoint(p),
-            GmlLineString ls        => builder.BuildLineString(ls),
-            GmlLinearRing lr        => builder.BuildLinearRing(lr),
-            GmlPolygon poly         => builder.BuildPolygon(poly),
-            GmlEnvelope env         => builder.BuildEnvelope(env),
-            GmlBox box              => builder.BuildBox(box),
-            GmlCurve c              => builder.BuildCurve(c),
-            GmlSurface s            => builder.BuildSurface(s),
-            GmlMultiPoint mp        => builder.BuildMultiPoint(mp),
-            GmlMultiLineString mls  => builder.BuildMultiLineString(mls),
-            GmlMultiPolygon mpoly   => builder.BuildMultiPolygon(mpoly),
-            _                       => default
-        };
-    }
-}
-```
-
----
-
-## Implementierungsdetail
-
-### GmlParser<TGeometry, TFeature, TCollection>.Parse
-
-Jede `Parse`-Ueberladung delegiert an die bestehende statische Parse-Logik und
-dispatcht das Ergebnis ueber den Builder:
-
-```csharp
-public GmlBuildResult<TGeometry, TFeature, TCollection> Parse(string xml)
-{
-    var parseResult = GmlParser.ParseXmlString(xml);
-    return BuildResult(parseResult);
-}
-
-public GmlBuildResult<TGeometry, TFeature, TCollection> Parse(ReadOnlySpan<byte> bytes)
-{
-    var parseResult = GmlParser.ParseBytes(bytes);
-    return BuildResult(parseResult);
-}
-
-public GmlBuildResult<TGeometry, TFeature, TCollection> Parse(Stream stream)
-{
-    var parseResult = GmlParser.ParseStream(stream);
-    return BuildResult(parseResult);
-}
-
-private GmlBuildResult<TGeometry, TFeature, TCollection> BuildResult(GmlParseResult parseResult)
-{
-    if (parseResult.Document is null)
-        return new() { Issues = parseResult.Issues };
-
-    var document = parseResult.Document;
-    var result = document.Root switch
-    {
-        GmlFeatureCollection fc => new GmlBuildResult<TGeometry, TFeature, TCollection>
-        {
-            Collection = _builder.BuildFeatureCollection(fc),
-            Document = document
-        },
-        GmlFeature f => new GmlBuildResult<TGeometry, TFeature, TCollection>
-        {
-            Feature = _builder.BuildFeature(f),
-            Document = document
-        },
-        GmlGeometry g => new GmlBuildResult<TGeometry, TFeature, TCollection>
-        {
-            Geometry = _builder.BuildGeometry(g),
-            Document = document
-        },
-        GmlCoverage c => new GmlBuildResult<TGeometry, TFeature, TCollection>
-        {
-            Coverage = _builder.BuildCoverage(c),
-            Document = document
-        },
-        _ => new GmlBuildResult<TGeometry, TFeature, TCollection>
-        {
-            Document = document
-        }
-    };
-
-    return result with { Issues = parseResult.Issues };
-}
-```
+Die Dispatch-Logik (welche Builder-Methode fuer welchen Geometrietyp?) ist als
+generische Extension-Method `BuildGeometry()` auf `IBuilder` zentralisiert.
+Siehe `src/Gml4Net/Interop/BuilderExtensions.cs`.
 
 ---
 
@@ -381,17 +283,6 @@ var kml = KmlBuilder.Geometry((GmlGeometry)document.Root);
 
 ## Dateien
 
-| Datei | Aenderung |
-|---|---|
-| `src/Gml4Net/Interop/IGmlBuilder.cs` | Rename → `IBuilder.cs`, `BuildCoverage` → `TFeature?` |
-| `src/Gml4Net/Interop/GeoJsonBuilder.cs` | `IGmlBuilder` → `IBuilder`, Signatur `BuildCoverage` |
-| `src/Gml4Net/Interop/KmlBuilder.cs` | `IGmlBuilder` → `IBuilder`, Signatur `BuildCoverage` |
-| `src/Gml4Net/Interop/WktBuilder.cs` | `IGmlBuilder` → `IBuilder`, Signatur `BuildCoverage` |
-| `src/Gml4Net/Interop/CsvBuilder.cs` | Kein Interface, keine Aenderung |
-| `src/Gml4Net/Interop/BuilderExtensions.cs` | **Neu** — `BuildGeometry()` Extension |
-| `src/Gml4Net/Model/GmlBuildResult.cs` | **Neu** — Ergebnistyp |
-| `src/Gml4Net/Parser/GmlParser.cs` | Factory-Methode `Create()` |
-| `src/Gml4Net/Parser/GmlParser{TGeometry,TFeature,TCollection}.cs` | **Neu** — Generischer Parser |
-| `tests/Gml4Net.Tests/Interop/IGmlBuilderTests.cs` | Rename → `IBuilderTests.cs`, anpassen |
-| `tests/Gml4Net.Tests/Parser/GmlParserBuilderTests.cs` | **Neu** — Tests fuer generischen Parser |
-| `tests/Gml4Net.Tests/Interop/BuilderExtensionsTests.cs` | **Neu** — Tests fuer BuildGeometry-Dispatch |
+Siehe `src/Gml4Net/Interop/` fuer `IBuilder`, `BuilderExtensions` und die
+Builder-Implementierungen. Siehe `src/Gml4Net/Parser/GmlParser{TGeometry,TFeature,TCollection}.cs`
+fuer den generischen Parser und `src/Gml4Net/Model/GmlBuildResult.cs` fuer den Ergebnistyp.
