@@ -16,6 +16,12 @@ public sealed record StreamingResult
     /// or were lost due to premature termination before delivery.
     /// </summary>
     public int FeaturesFailed { get; init; }
+
+    /// <summary>
+    /// Number of features that were successfully parsed but excluded by the
+    /// configured filter predicate.
+    /// </summary>
+    public int FeaturesFiltered { get; init; }
 }
 
 /// <summary>
@@ -23,6 +29,8 @@ public sealed record StreamingResult
 /// </summary>
 /// <param name="FeaturesProcessed">Cumulative count of successfully processed features.</param>
 /// <param name="FeaturesFailed">Cumulative count of failed features.</param>
+/// <param name="FeaturesFiltered">Cumulative count of filtered features.</param>
 public readonly record struct StreamingProgress(
     int FeaturesProcessed,
-    int FeaturesFailed);
+    int FeaturesFailed,
+    int FeaturesFiltered);

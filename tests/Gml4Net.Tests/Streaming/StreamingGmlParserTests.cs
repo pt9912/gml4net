@@ -877,7 +877,561 @@ public class StreamingGmlParserTests
         errors[0].CanContinue.Should().BeFalse();
     }
 
+    // ---- Filter ----
+
+    [Fact]
+    public async Task Filter_PassesAll_NoFiltered()
+    {
+        var xml = BuildWfsCollection(3);
+        using var stream = ToStream(xml);
+
+        var parser = new StreamingGmlParser(new StreamingParserOptions
+        {
+            Filter = _ => true
+        });
+        parser.OnFeature(_ => ValueTask.CompletedTask);
+
+        var result = await parser.ParseAsync(stream);
+
+        result.FeaturesProcessed.Should().Be(3);
+        result.FeaturesFailed.Should().Be(0);
+        result.FeaturesFiltered.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Filter_RejectsAll_AllFiltered()
+    {
+        var xml = BuildWfsCollection(5);
+        using var stream = ToStream(xml);
+
+        var parser = new StreamingGmlParser(new StreamingParserOptions
+        {
+            Filter = _ => false
+        });
+        parser.OnFeature(_ => { Assert.Fail("OnFeature should not be called"); return ValueTask.CompletedTask; });
+
+        var result = await parser.ParseAsync(stream);
+
+        result.FeaturesProcessed.Should().Be(0);
+        result.FeaturesFailed.Should().Be(0);
+        result.FeaturesFiltered.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task Filter_RejectsSome_CorrectCounters()
+    {
+        var xml = BuildWfsCollection(5);
+        using var stream = ToStream(xml);
+        var processedIds = new List<string?>();
+
+        var parser = new StreamingGmlParser(new StreamingParserOptions
+        {
+            Filter = f => f.Id is "item.1" or "item.3"
+        });
+        parser.OnFeature(f => { processedIds.Add(f.Id); return ValueTask.CompletedTask; });
+
+        var result = await parser.ParseAsync(stream);
+
+        result.FeaturesProcessed.Should().Be(2);
+        result.FeaturesFiltered.Should().Be(3);
+        result.FeaturesFailed.Should().Be(0);
+        processedIds.Should().Equal("item.1", "item.3");
+    }
+
+    [Fact]
+    public async Task Filter_NoFilterSet_ZeroFiltered()
+    {
+        var xml = BuildWfsCollection(3);
+        using var stream = ToStream(xml);
+
+        var parser = new StreamingGmlParser();
+        var result = await parser.ParseAsync(stream);
+
+        result.FeaturesFiltered.Should().Be(0);
+        result.FeaturesProcessed.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Filter_ThrowsException_CountedAsFailed()
+    {
+        var xml = BuildWfsCollection(3);
+        using var stream = ToStream(xml);
+        var errors = new List<StreamingError>();
+
+        var parser = new StreamingGmlParser(new StreamingParserOptions
+        {
+            ErrorBehavior = StreamingErrorBehavior.Continue,
+            Filter = f => f.Id == "item.1" ? throw new InvalidOperationException("filter error") : true
+        });
+        parser.OnFeature(_ => ValueTask.CompletedTask);
+        parser.OnError(e => errors.Add(e));
+
+        var result = await parser.ParseAsync(stream);
+
+        result.FeaturesProcessed.Should().Be(2);
+        result.FeaturesFailed.Should().Be(1);
+        result.FeaturesFiltered.Should().Be(0);
+        errors.Should().HaveCount(1);
+        errors[0].FeatureId.Should().Be("item.1");
+    }
+
+    [Fact]
+    public async Task Filter_WithStop_StopsAfterFilterError()
+    {
+        var xml = BuildWfsCollection(5);
+        using var stream = ToStream(xml);
+
+        var parser = new StreamingGmlParser(new StreamingParserOptions
+        {
+            ErrorBehavior = StreamingErrorBehavior.Stop,
+            Filter = f => f.Id == "item.2" ? throw new InvalidOperationException("fail") : true
+        });
+        parser.OnFeature(_ => ValueTask.CompletedTask);
+
+        var result = await parser.ParseAsync(stream);
+
+        result.FeaturesProcessed.Should().Be(2);
+        result.FeaturesFailed.Should().Be(1);
+        result.FeaturesFiltered.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Filter_WithProgress_ReportsFilteredCount()
+    {
+        var xml = BuildWfsCollection(4);
+        using var stream = ToStream(xml);
+        var reports = new List<StreamingProgress>();
+
+        var parser = new StreamingGmlParser(new StreamingParserOptions
+        {
+            Filter = f => f.Id is "item.0" or "item.2",
+            Progress = new SyncProgress<StreamingProgress>(p => reports.Add(p))
+        });
+        parser.OnFeature(_ => ValueTask.CompletedTask);
+
+        var result = await parser.ParseAsync(stream);
+
+        reports.Should().HaveCount(4);
+        reports[^1].FeaturesProcessed.Should().Be(2);
+        reports[^1].FeaturesFiltered.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Filter_BatchPath_OnlyUnfilteredInBatch()
+    {
+        var xml = BuildWfsCollection(6);
+        using var stream = ToStream(xml);
+        var builder = new GeoJsonBuilder();
+        var batchSizes = new List<int>();
+
+        var result = await StreamingGml.ParseBatchesAsync(
+            stream,
+            builder,
+            batch => { batchSizes.Add(batch.Count); return ValueTask.CompletedTask; },
+            batchSize: 2,
+            options: new StreamingParserOptions
+            {
+                // Accept only even-indexed items: 0, 2, 4
+                Filter = f => int.Parse(f.Id!.Split('.')[1]) % 2 == 0
+            });
+
+        result.FeaturesProcessed.Should().Be(3);
+        result.FeaturesFiltered.Should().Be(3);
+        // 3 unfiltered features, batchSize 2: batches of 2, 1
+        batchSizes.Should().Equal(2, 1);
+    }
+
+    [Fact]
+    public async Task Filter_SinkPath_OnlyUnfilteredWritten()
+    {
+        var xml = BuildWfsCollection(5);
+        using var stream = ToStream(xml);
+        var sink = new TestSink();
+
+        var result = await StreamingGml.ParseAsync(
+            stream,
+            sink,
+            options: new StreamingParserOptions
+            {
+                Filter = f => f.Id is "item.0" or "item.4"
+            });
+
+        result.FeaturesProcessed.Should().Be(2);
+        result.FeaturesFiltered.Should().Be(3);
+        sink.Features.Should().HaveCount(2);
+        sink.Completed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Filter_SinkPath_CompleteCalledDespiteFiltering()
+    {
+        var xml = BuildWfsCollection(3);
+        using var stream = ToStream(xml);
+        var sink = new TestSink();
+
+        var result = await StreamingGml.ParseAsync(
+            stream,
+            sink,
+            options: new StreamingParserOptions { Filter = _ => false });
+
+        result.FeaturesFiltered.Should().Be(3);
+        sink.Features.Should().BeEmpty();
+        sink.Completed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Filter_BatchPath_FilterErrorCountedAsFailed()
+    {
+        var xml = BuildWfsCollection(4);
+        using var stream = ToStream(xml);
+        var builder = new GeoJsonBuilder();
+        var errors = new List<StreamingError>();
+
+        var result = await StreamingGml.ParseBatchesAsync(
+            stream,
+            builder,
+            batch => ValueTask.CompletedTask,
+            batchSize: 10,
+            onError: e => errors.Add(e),
+            options: new StreamingParserOptions
+            {
+                ErrorBehavior = StreamingErrorBehavior.Continue,
+                Filter = f => f.Id == "item.2" ? throw new Exception("filter fail") : true
+            });
+
+        result.FeaturesProcessed.Should().Be(3);
+        result.FeaturesFailed.Should().Be(1);
+        result.FeaturesFiltered.Should().Be(0);
+        errors.Should().ContainSingle(e => e.FeatureId == "item.2");
+    }
+
+    [Fact]
+    public async Task Filter_SinkPath_FilterErrorCountedAsFailed()
+    {
+        var xml = BuildWfsCollection(4);
+        using var stream = ToStream(xml);
+        var sink = new TestSink();
+        var errors = new List<StreamingError>();
+
+        var result = await StreamingGml.ParseAsync(
+            stream,
+            sink,
+            onError: e => errors.Add(e),
+            options: new StreamingParserOptions
+            {
+                ErrorBehavior = StreamingErrorBehavior.Continue,
+                Filter = f => f.Id == "item.1" ? throw new Exception("filter fail") : true
+            });
+
+        result.FeaturesProcessed.Should().Be(3);
+        result.FeaturesFailed.Should().Be(1);
+        sink.Features.Should().HaveCount(3);
+        sink.Completed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Filter_SinkPath_FilterErrorWithStop()
+    {
+        var xml = BuildWfsCollection(5);
+        using var stream = ToStream(xml);
+        var sink = new TestSink();
+
+        var result = await StreamingGml.ParseAsync(
+            stream,
+            sink,
+            options: new StreamingParserOptions
+            {
+                ErrorBehavior = StreamingErrorBehavior.Stop,
+                Filter = f => f.Id == "item.1" ? throw new Exception("fail") : true
+            });
+
+        result.FeaturesProcessed.Should().Be(1);
+        result.FeaturesFailed.Should().Be(1);
+        sink.Completed.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Filter_BatchPath_FilterWithStop()
+    {
+        var xml = BuildWfsCollection(5);
+        using var stream = ToStream(xml);
+        var builder = new GeoJsonBuilder();
+
+        var result = await StreamingGml.ParseBatchesAsync(
+            stream,
+            builder,
+            batch => ValueTask.CompletedTask,
+            batchSize: 10,
+            options: new StreamingParserOptions
+            {
+                ErrorBehavior = StreamingErrorBehavior.Stop,
+                Filter = f => f.Id == "item.2" ? throw new Exception("fail") : true
+            });
+
+        result.FeaturesProcessed.Should().Be(0); // batch not flushed yet
+        result.FeaturesFailed.Should().Be(1 + 2); // filter error + 2 pending
+    }
+
+    [Fact]
+    public async Task Filter_BatchPath_RejectsAll_NoBatchCallback()
+    {
+        var xml = BuildWfsCollection(5);
+        using var stream = ToStream(xml);
+        var builder = new GeoJsonBuilder();
+
+        var result = await StreamingGml.ParseBatchesAsync(
+            stream,
+            builder,
+            _ => { Assert.Fail("onBatch should not be called"); return ValueTask.CompletedTask; },
+            batchSize: 2,
+            options: new StreamingParserOptions { Filter = _ => false });
+
+        result.FeaturesFiltered.Should().Be(5);
+        result.FeaturesProcessed.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Filter_SinkPath_RejectsAll_CompleteStillCalled()
+    {
+        var xml = BuildWfsCollection(3);
+        using var stream = ToStream(xml);
+        var sink = new TestSink();
+
+        await StreamingGml.ParseAsync(stream, sink,
+            options: new StreamingParserOptions { Filter = _ => false });
+
+        sink.Features.Should().BeEmpty();
+        sink.Completed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Filter_SinkPath_MixedFilterAndErrors()
+    {
+        var xml = BuildWfsCollection(5);
+        using var stream = ToStream(xml);
+        var sink = new FailOnIdSink("item.3");
+
+        var result = await StreamingGml.ParseAsync(
+            stream,
+            sink,
+            options: new StreamingParserOptions
+            {
+                ErrorBehavior = StreamingErrorBehavior.Continue,
+                Filter = f => f.Id != "item.1"
+            });
+
+        // item.0: accepted, written OK → processed
+        // item.1: filtered
+        // item.2: accepted, written OK → processed
+        // item.3: accepted, sink throws → failed
+        // item.4: accepted, written OK → processed
+        result.FeaturesProcessed.Should().Be(3);
+        result.FeaturesFiltered.Should().Be(1);
+        result.FeaturesFailed.Should().Be(1);
+        sink.Completed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Filter_BatchPath_MixedFilterAndBuilderError()
+    {
+        var xml = BuildWfsCollection(6);
+        using var stream = ToStream(xml);
+        var builder = new ThrowOnIdBuilder("item.3");
+        var batchSizes = new List<int>();
+
+        var result = await StreamingGml.ParseBatchesAsync(
+            stream,
+            builder,
+            batch => { batchSizes.Add(batch.Count); return ValueTask.CompletedTask; },
+            batchSize: 2,
+            options: new StreamingParserOptions
+            {
+                ErrorBehavior = StreamingErrorBehavior.Continue,
+                Filter = f => f.Id != "item.1"
+            });
+
+        // item.0: accepted, built → batch[0]
+        // item.1: filtered
+        // item.2: accepted, built → batch[1] → flush (2)
+        // item.3: accepted, builder throws → failed
+        // item.4: accepted, built → batch[0]
+        // item.5: accepted, built → batch[1] → flush (2)
+        result.FeaturesProcessed.Should().Be(4);
+        result.FeaturesFailed.Should().Be(1);
+        result.FeaturesFiltered.Should().Be(1);
+        batchSizes.Should().Equal(2, 2);
+    }
+
+    [Fact]
+    public async Task Filter_BuilderPath_FiltersBeforeBuilder()
+    {
+        var xml = BuildWfsCollection(3);
+        using var stream = ToStream(xml);
+        var builder = new GeoJsonBuilder();
+        var features = new List<object>();
+
+        var result = await StreamingGml.ParseAsync(
+            stream,
+            builder,
+            f => { features.Add(f); return ValueTask.CompletedTask; },
+            options: new StreamingParserOptions
+            {
+                Filter = f => f.Id != "item.1"
+            });
+
+        result.FeaturesProcessed.Should().Be(2);
+        result.FeaturesFiltered.Should().Be(1);
+        features.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Filter_ThrowsOCE_PropagatesImmediately()
+    {
+        var xml = BuildWfsCollection(5);
+        using var stream = ToStream(xml);
+
+        var parser = new StreamingGmlParser(new StreamingParserOptions
+        {
+            Filter = _ => throw new OperationCanceledException()
+        });
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => parser.ParseAsync(stream));
+    }
+
+    [Fact]
+    public async Task Filter_BatchPath_ThrowsOCE_Propagates()
+    {
+        var xml = BuildWfsCollection(3);
+        using var stream = ToStream(xml);
+        var builder = new GeoJsonBuilder();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => StreamingGml.ParseBatchesAsync(
+                stream, builder, _ => ValueTask.CompletedTask, batchSize: 10,
+                options: new StreamingParserOptions
+                {
+                    Filter = _ => throw new OperationCanceledException()
+                }));
+    }
+
+    [Fact]
+    public async Task Filter_SinkPath_ThrowsOCE_Propagates()
+    {
+        var xml = BuildWfsCollection(3);
+        using var stream = ToStream(xml);
+        var sink = new TestSink();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => StreamingGml.ParseAsync(
+                stream, sink,
+                options: new StreamingParserOptions
+                {
+                    Filter = _ => throw new OperationCanceledException()
+                }));
+
+        sink.Completed.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Filter_OnEnd_ReceivesFilteredCount()
+    {
+        var xml = BuildWfsCollection(5);
+        using var stream = ToStream(xml);
+        StreamingResult? endResult = null;
+
+        var parser = new StreamingGmlParser(new StreamingParserOptions
+        {
+            Filter = f => f.Id is "item.0" or "item.3"
+        });
+        parser.OnFeature(_ => ValueTask.CompletedTask);
+        parser.OnEnd(r => endResult = r);
+
+        var result = await parser.ParseAsync(stream);
+
+        endResult.Should().NotBeNull();
+        endResult!.FeaturesFiltered.Should().Be(3);
+        endResult.Should().Be(result);
+    }
+
+    [Fact]
+    public async Task Filter_WithHandlerError_CorrectCounterSplit()
+    {
+        var xml = BuildWfsCollection(6);
+        using var stream = ToStream(xml);
+
+        var parser = new StreamingGmlParser(new StreamingParserOptions
+        {
+            ErrorBehavior = StreamingErrorBehavior.Continue,
+            Filter = f => f.Id != "item.1" && f.Id != "item.4" // filter out 2
+        });
+        parser.OnFeature(f =>
+        {
+            if (f.Id == "item.3") throw new Exception("handler fail");
+            return ValueTask.CompletedTask;
+        });
+
+        var result = await parser.ParseAsync(stream);
+
+        // item.0: accepted, OK → processed
+        // item.1: filtered
+        // item.2: accepted, OK → processed
+        // item.3: accepted, handler throws → failed
+        // item.4: filtered
+        // item.5: accepted, OK → processed
+        result.FeaturesProcessed.Should().Be(3);
+        result.FeaturesFailed.Should().Be(1);
+        result.FeaturesFiltered.Should().Be(2);
+        (result.FeaturesProcessed + result.FeaturesFailed + result.FeaturesFiltered).Should().Be(6);
+    }
+
+    [Fact]
+    public async Task Filter_ResultSumIsTotal()
+    {
+        var xml = BuildWfsCollection(10);
+        using var stream = ToStream(xml);
+
+        var parser = new StreamingGmlParser(new StreamingParserOptions
+        {
+            ErrorBehavior = StreamingErrorBehavior.Continue,
+            Filter = f =>
+            {
+                if (f.Id == "item.5") throw new Exception("filter err");
+                return f.Id is "item.0" or "item.2" or "item.4" or "item.6" or "item.8";
+            }
+        });
+        parser.OnFeature(_ => ValueTask.CompletedTask);
+
+        var result = await parser.ParseAsync(stream);
+
+        // 5 accepted, 4 filtered, 1 failed
+        result.FeaturesProcessed.Should().Be(5);
+        result.FeaturesFiltered.Should().Be(4);
+        result.FeaturesFailed.Should().Be(1);
+        (result.FeaturesProcessed + result.FeaturesFailed + result.FeaturesFiltered).Should().Be(10);
+    }
+
     // ---- ParseItemsAsync internal ----
+
+    [Fact]
+    public async Task LowLevel_ParseAsync_TruncatedXml_Throws()
+    {
+        var xml = """
+            <wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0"
+                                   xmlns:gml="http://www.opengis.net/gml/3.2"
+                                   xmlns:app="http://example.com/app">
+                <wfs:member>
+                    <app:City gml:id="city.1"><app:name>Munich
+            """;
+        using var stream = ToStream(xml);
+
+        var act = async () =>
+        {
+            await foreach (var _ in GmlFeatureStreamParser.ParseAsync(stream)) { }
+        };
+
+        await act.Should().ThrowAsync<Exception>();
+    }
 
     [Fact]
     public async Task ParseItemsAsync_RecoverableError_HasCanContinueTrue()

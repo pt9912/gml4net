@@ -78,6 +78,7 @@ public sealed class StreamingGmlParser
 
         int processed = 0;
         int failed = 0;
+        int filtered = 0;
         ExceptionDispatchInfo? fatalEdi = null;
 
         try
@@ -86,13 +87,13 @@ public sealed class StreamingGmlParser
             {
                 if (item.IsSuccess)
                 {
-                    if (_onFeature is not null)
+                    // Evaluate filter
+                    if (_options.Filter is { } filter)
                     {
+                        bool accepted;
                         try
                         {
-                            await _onFeature(item.Feature!).ConfigureAwait(false);
-                            processed++;
-                            _options.Progress?.Report(new StreamingProgress(processed, failed));
+                            accepted = filter(item.Feature!);
                         }
                         catch (OperationCanceledException) { throw; }
                         catch (Exception ex)
@@ -106,7 +107,55 @@ public sealed class StreamingGmlParser
                                 CanContinue = true
                             });
 
-                            _options.Progress?.Report(new StreamingProgress(processed, failed));
+                            _options.Progress?.Report(new StreamingProgress(processed, failed, filtered));
+
+                            if (_options.ErrorBehavior == StreamingErrorBehavior.Stop)
+                                break;
+
+                            continue;
+                        }
+
+                        if (!accepted)
+                        {
+                            filtered++;
+
+                            // Forward non-fatal diagnostics even for filtered features
+                            if (item.Issues.Count > 0)
+                            {
+                                _onError?.Invoke(new StreamingError
+                                {
+                                    Issues = item.Issues,
+                                    FeatureId = item.Feature!.Id,
+                                    CanContinue = true
+                                });
+                            }
+
+                            _options.Progress?.Report(new StreamingProgress(processed, failed, filtered));
+                            continue;
+                        }
+                    }
+
+                    if (_onFeature is not null)
+                    {
+                        try
+                        {
+                            await _onFeature(item.Feature!).ConfigureAwait(false);
+                            processed++;
+                            _options.Progress?.Report(new StreamingProgress(processed, failed, filtered));
+                        }
+                        catch (OperationCanceledException) { throw; }
+                        catch (Exception ex)
+                        {
+                            failed++;
+                            _onError?.Invoke(new StreamingError
+                            {
+                                Exception = ex,
+                                Issues = item.Issues,
+                                FeatureId = item.Feature!.Id,
+                                CanContinue = true
+                            });
+
+                            _options.Progress?.Report(new StreamingProgress(processed, failed, filtered));
 
                             if (_options.ErrorBehavior == StreamingErrorBehavior.Stop)
                                 break;
@@ -115,7 +164,7 @@ public sealed class StreamingGmlParser
                     else
                     {
                         processed++;
-                        _options.Progress?.Report(new StreamingProgress(processed, failed));
+                        _options.Progress?.Report(new StreamingProgress(processed, failed, filtered));
                     }
                 }
                 else
@@ -128,7 +177,7 @@ public sealed class StreamingGmlParser
                         CanContinue = item.CanContinue
                     });
 
-                    _options.Progress?.Report(new StreamingProgress(processed, failed));
+                    _options.Progress?.Report(new StreamingProgress(processed, failed, filtered));
 
                     if (!item.CanContinue || _options.ErrorBehavior == StreamingErrorBehavior.Stop)
                         break;
@@ -140,7 +189,12 @@ public sealed class StreamingGmlParser
             fatalEdi = ExceptionDispatchInfo.Capture(ex);
         }
 
-        var result = new StreamingResult { FeaturesProcessed = processed, FeaturesFailed = failed };
+        var result = new StreamingResult
+        {
+            FeaturesProcessed = processed,
+            FeaturesFailed = failed,
+            FeaturesFiltered = filtered
+        };
         _onEnd?.Invoke(result);
 
         fatalEdi?.Throw();

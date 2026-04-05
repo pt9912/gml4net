@@ -1,3 +1,5 @@
+using Gml4Net.Model.Feature;
+
 namespace Gml4Net.Parser;
 
 /// <summary>
@@ -14,9 +16,19 @@ public sealed class StreamingParserOptions
 
     /// <summary>
     /// Optional progress reporting after each feature outcome
-    /// (success or failure).
+    /// (success, failure, or filtered).
     /// </summary>
     public IProgress<StreamingProgress>? Progress { get; init; }
+
+    /// <summary>
+    /// Optional predicate that determines whether a successfully parsed feature
+    /// should be emitted to the configured callback, batch, or sink.
+    /// Features for which the predicate returns false are silently skipped
+    /// and counted as filtered, not as processed or failed. If the parsed feature
+    /// already carries non-fatal parser diagnostics, these diagnostics are still
+    /// forwarded via the configured error callback.
+    /// </summary>
+    public Func<GmlFeature, bool>? Filter { get; init; }
 }
 
 /// <summary>

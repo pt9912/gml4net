@@ -84,6 +84,7 @@ public static class StreamingGml
         var opts = options ?? new StreamingParserOptions();
         int processed = 0;
         int failed = 0;
+        int filtered = 0;
         var batch = new List<TFeature>(batchSize);
         var stopped = false;
 
@@ -91,6 +92,56 @@ public static class StreamingGml
         {
             if (item.IsSuccess)
             {
+                // Evaluate filter before builder
+                if (opts.Filter is { } filter)
+                {
+                    bool accepted;
+                    try
+                    {
+                        accepted = filter(item.Feature!);
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        onError?.Invoke(new StreamingError
+                        {
+                            Exception = ex,
+                            Issues = item.Issues,
+                            FeatureId = item.Feature!.Id,
+                            CanContinue = true
+                        });
+
+                        opts.Progress?.Report(new StreamingProgress(processed, failed, filtered));
+
+                        if (opts.ErrorBehavior == StreamingErrorBehavior.Stop)
+                        {
+                            stopped = true;
+                            break;
+                        }
+
+                        continue;
+                    }
+
+                    if (!accepted)
+                    {
+                        filtered++;
+
+                        if (item.Issues.Count > 0)
+                        {
+                            onError?.Invoke(new StreamingError
+                            {
+                                Issues = item.Issues,
+                                FeatureId = item.Feature!.Id,
+                                CanContinue = true
+                            });
+                        }
+
+                        opts.Progress?.Report(new StreamingProgress(processed, failed, filtered));
+                        continue;
+                    }
+                }
+
                 try
                 {
                     var built = builder.BuildFeature(item.Feature!);
@@ -108,7 +159,7 @@ public static class StreamingGml
                         CanContinue = true
                     });
 
-                    opts.Progress?.Report(new StreamingProgress(processed, failed));
+                    opts.Progress?.Report(new StreamingProgress(processed, failed, filtered));
 
                     if (opts.ErrorBehavior == StreamingErrorBehavior.Stop)
                     {
@@ -149,7 +200,7 @@ public static class StreamingGml
                     batch.Clear();
                 }
 
-                opts.Progress?.Report(new StreamingProgress(processed, failed));
+                opts.Progress?.Report(new StreamingProgress(processed, failed, filtered));
             }
             else
             {
@@ -161,7 +212,7 @@ public static class StreamingGml
                     CanContinue = item.CanContinue
                 });
 
-                opts.Progress?.Report(new StreamingProgress(processed, failed));
+                opts.Progress?.Report(new StreamingProgress(processed, failed, filtered));
 
                 if (!item.CanContinue || opts.ErrorBehavior == StreamingErrorBehavior.Stop)
                 {
@@ -199,7 +250,12 @@ public static class StreamingGml
             }
         }
 
-        return new StreamingResult { FeaturesProcessed = processed, FeaturesFailed = failed };
+        return new StreamingResult
+        {
+            FeaturesProcessed = processed,
+            FeaturesFailed = failed,
+            FeaturesFiltered = filtered
+        };
     }
 
     /// <summary>
@@ -224,17 +280,68 @@ public static class StreamingGml
         var opts = options ?? new StreamingParserOptions();
         int processed = 0;
         int failed = 0;
+        int filtered = 0;
         var stopped = false;
 
         await foreach (var item in GmlFeatureStreamParser.ParseItemsAsync(stream, ct).ConfigureAwait(false))
         {
             if (item.IsSuccess)
             {
+                // Evaluate filter before sink write
+                if (opts.Filter is { } filter)
+                {
+                    bool accepted;
+                    try
+                    {
+                        accepted = filter(item.Feature!);
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        onError?.Invoke(new StreamingError
+                        {
+                            Exception = ex,
+                            Issues = item.Issues,
+                            FeatureId = item.Feature!.Id,
+                            CanContinue = true
+                        });
+
+                        opts.Progress?.Report(new StreamingProgress(processed, failed, filtered));
+
+                        if (opts.ErrorBehavior == StreamingErrorBehavior.Stop)
+                        {
+                            stopped = true;
+                            break;
+                        }
+
+                        continue;
+                    }
+
+                    if (!accepted)
+                    {
+                        filtered++;
+
+                        if (item.Issues.Count > 0)
+                        {
+                            onError?.Invoke(new StreamingError
+                            {
+                                Issues = item.Issues,
+                                FeatureId = item.Feature!.Id,
+                                CanContinue = true
+                            });
+                        }
+
+                        opts.Progress?.Report(new StreamingProgress(processed, failed, filtered));
+                        continue;
+                    }
+                }
+
                 try
                 {
                     await sink.WriteFeatureAsync(item.Feature!, ct).ConfigureAwait(false);
                     processed++;
-                    opts.Progress?.Report(new StreamingProgress(processed, failed));
+                    opts.Progress?.Report(new StreamingProgress(processed, failed, filtered));
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
@@ -248,7 +355,7 @@ public static class StreamingGml
                         CanContinue = true
                     });
 
-                    opts.Progress?.Report(new StreamingProgress(processed, failed));
+                    opts.Progress?.Report(new StreamingProgress(processed, failed, filtered));
 
                     if (opts.ErrorBehavior == StreamingErrorBehavior.Stop)
                     {
@@ -267,7 +374,7 @@ public static class StreamingGml
                     CanContinue = item.CanContinue
                 });
 
-                opts.Progress?.Report(new StreamingProgress(processed, failed));
+                opts.Progress?.Report(new StreamingProgress(processed, failed, filtered));
 
                 if (!item.CanContinue || opts.ErrorBehavior == StreamingErrorBehavior.Stop)
                 {
@@ -280,6 +387,11 @@ public static class StreamingGml
         if (!stopped)
             await sink.CompleteAsync(ct).ConfigureAwait(false);
 
-        return new StreamingResult { FeaturesProcessed = processed, FeaturesFailed = failed };
+        return new StreamingResult
+        {
+            FeaturesProcessed = processed,
+            FeaturesFailed = failed,
+            FeaturesFiltered = filtered
+        };
     }
 }
