@@ -297,9 +297,10 @@ Geometrie  Parser     Parser +   GeoJSON    WCS        + I/O      Builder
 
 #### 6.1 Streaming-Parser
 
-- [x] `GmlFeatureStreamParser`:
+- [x] `GmlFeatureStreamParser` (Low-Level):
   - [x] `ParseAsync(Stream)` → `IAsyncEnumerable<GmlFeature>`
   - [x] `ParseAsync(XmlReader)` → internes Overload fuer vorpositionierte Reader
+  - [x] `ParseItemsAsync(Stream)` → `IAsyncEnumerable<FeatureStreamItem>` (error-aware)
   - [x] `ProcessFeaturesAsync(Stream, Func<GmlFeature, Task>)` → `Task<int>`
   - [x] Basiert auf `XmlReader` (forward-only, O(1) Speicher)
   - [x] Erkennt Feature-Member-Grenzen:
@@ -310,7 +311,23 @@ Geometrie  Parser     Parser +   GeoJSON    WCS        + I/O      Builder
   - [x] Uebergibt Fragmente an bestehende `FeatureParser`/`GeometryParser`
   - [x] GML-Versionserkennung per Feature-Fragment (`XmlHelpers.DetectVersion` Overload)
   - [x] `CancellationToken`-Support mit kooperativer Cancellation
-- [x] Tests (11 Streaming-Tests):
+  - [x] Recoverable vs. fatale Fehlerunterscheidung via `FeatureStreamItem`
+- [x] `StreamingGmlParser` (oeffentliche Callback-API):
+  - [x] `OnFeature(Func<GmlFeature, ValueTask>)` -- pro Feature
+  - [x] `OnError(Action<StreamingError>)` -- pro Fehler
+  - [x] `OnEnd(Action<StreamingResult>)` -- immer, auch bei Abbruch/Cancellation
+  - [x] `ParseAsync(Stream, CancellationToken)` → `Task<StreamingResult>`
+  - [x] `StreamingParserOptions` mit `ErrorBehavior` (Stop/Continue) und `IProgress`
+  - [x] Einmalnutzung (Single-Use), Setup-then-Run
+- [x] `StreamingGml` (Convenience):
+  - [x] `ParseAsync(Stream, IBuilder, onFeature, onError?, options?, ct)` -- Builder-Integration
+  - [x] `ParseBatchesAsync(Stream, IBuilder, onBatch, batchSize, onError?, options?, ct)` -- Batch-Verarbeitung
+  - [x] `ParseAsync(Stream, IFeatureSink, onError?, options?, ct)` -- Sink-Integration
+- [x] `IFeatureSink`:
+  - [x] `WriteFeatureAsync(GmlFeature, CancellationToken)` -- pro Feature
+  - [x] `CompleteAsync(CancellationToken)` -- am erfolgreichen Ende
+  - [x] Nicht aufgerufen bei fatalem Abbruch oder Cancellation
+- [x] Tests (11 Low-Level + 40+ Streaming-API-Tests):
   - [x] WFS 2.0 `wfs:member`, GML `featureMember`, `featureMembers` (Plural)
   - [x] DOM/Streaming-Ergebnisvergleich
   - [x] 10.000-Feature-Dokument
@@ -320,6 +337,13 @@ Geometrie  Parser     Parser +   GeoJSON    WCS        + I/O      Builder
   - [x] GML 2 Versionserkennung im Streaming
   - [x] GML 3.1 Legacy-Versionserkennung
   - [x] Null-Guard-Tests
+  - [x] OnFeature/OnError/OnEnd Callbacks
+  - [x] Continue/Stop Fehlerverhalten
+  - [x] Progress-Reporting
+  - [x] Builder-Integration und Fehler
+  - [x] Batch-Verarbeitung, partieller Batch, Batch-Fehler
+  - [x] IFeatureSink-Lifecycle (Write, Complete, Cancellation)
+  - [x] Fatale XML-Fehler (truncated streams)
 
 #### 6.2 I/O-Paket (Gml4Net.IO)
 
@@ -364,7 +388,7 @@ Geometrie  Parser     Parser +   GeoJSON    WCS        + I/O      Builder
 
 ### Aufgaben
 
-- [x] `IGmlBuilder<TGeometry, TFeature, TCollection>` Interface finalisiert
+- [x] `IBuilder<TGeometry, TFeature, TCollection>` Interface finalisiert
 - [x] Bestehende Builder (`GeoJsonBuilder`, `WktBuilder`) behalten statische API
   (Interface-Implementierung optional fuer Custom-Builder)
 - [x] Neue Builder:
@@ -444,8 +468,7 @@ Jede Phase gilt als abgeschlossen, wenn:
 
 | Frage | Bereich | Entscheidungszeitpunkt |
 |---|---|---|
-| Soll `GeoJsonBuilder` auch `IGmlBuilder` implementieren? | Interop | Phase 4 / 7 |
-| CLI als eigenes Paket oder im Core? | Packaging | Phase 7 |
+| CLI als eigenes Paket oder im Core? | Packaging | Spaetere Iteration |
 
 ## Getroffene Entscheidungen
 
@@ -455,6 +478,8 @@ Jede Phase gilt als abgeschlossen, wenn:
 | API-Einstieg: `GmlParser.ParseXmlString()` (statische Klasse) | API-Design | Phase 1 |
 | Test-Framework: xUnit v3 + FluentAssertions | Test | Phase 1 |
 | NuGet-Releases auf `nuget.org` via Docker-gestuetztem `pack`/`push`-Workflow | Release | Design-Phase |
+| Builder-Interface heisst `IBuilder`, alle Kern-Builder implementieren es (ausser CsvBuilder) | Interop | Phase 7 |
+| Streaming-API: nicht-generischer `StreamingGmlParser` + generische `StreamingGml`-Convenience | Streaming | Phase 6 |
 
 ---
 

@@ -1,46 +1,35 @@
 # Gml4Net
 
-Design and planning documents for a proposed .NET library for parsing Geography Markup Language (GML) documents.
+A .NET library for parsing Geography Markup Language (GML) documents. Supports GML 2-3.3, GeoJSON/WKT/KML/CSV export, OWS/WCS integration, and streaming for large documents.
 
-## Status
+## Features
 
-Phase 1 (Core-Modell + Geometrie-Parser) is complete.
+- **GML Parsing** -- Geometries, features, feature collections, and coverages
+- **Version Support** -- GML 2.1.2, 3.0, 3.1, 3.2, 3.3 with automatic version detection
+- **GeoJSON Export** -- Conversion to GeoJSON via `System.Text.Json`
+- **WKT Export** -- Conversion to Well-Known Text
+- **KML Export** -- Conversion to KML via `System.Xml.Linq`
+- **CSV Export** -- Feature collections to CSV with WKT geometry column
+- **Generic Builder** -- `IBuilder<TGeometry, TFeature, TCollection>` for custom output formats
+- **Coverage Support** -- RectifiedGridCoverage, GridCoverage, ReferenceableGridCoverage, MultiPointCoverage
+- **WCS Integration** -- Request builder and capabilities parser for OGC Web Coverage Service
+- **OWS Exceptions** -- Detection and parsing of OGC Web Service exception reports
+- **Streaming** -- Memory-efficient processing of large WFS feature collections with callback-based public API, batch support, and feature sinks
+- **Zero Dependencies** -- Only BCL APIs (`System.Xml.Linq`, `System.Text.Json`)
 
-- Geometry parsing works for all GML 2 and GML 3 types (41 tests passing)
-- No NuGet packages have been published yet
-- Feature parsing (Phase 2) is next
+## Packages
 
-## Planned Scope
+| Package | Description |
+|---------|-------------|
+| `Gml4Net` | Core library: model, parser, GeoJSON/WKT/KML/CSV interop, OWS, WCS, streaming |
+| `Gml4Net.IO` | Optional package: file and HTTP I/O, streaming from files and URLs |
 
-- **GML Parsing** -- Planned support for geometries, features, feature collections, and coverages
-- **Version Support** -- Planned support for GML 2.1.2, 3.0, 3.1, 3.2, 3.3 with automatic version detection
-- **GeoJSON Export** -- Planned conversion to GeoJSON via `System.Text.Json`
-- **WKT Export** -- Planned conversion to Well-Known Text
-- **Coverage Support** -- Planned coverage support for RectifiedGridCoverage, GridCoverage, ReferenceableGridCoverage, MultiPointCoverage
-- **WCS Integration** -- Planned request builder and capabilities parser for OGC Web Coverage Service
-- **OWS Exceptions** -- Planned detection and parsing of OGC Web Service exception reports
-- **Streaming** -- Planned memory-efficient processing of large WFS feature collections via `IAsyncEnumerable<T>`
-- **Zero Dependencies** -- The core design targets only BCL APIs (`System.Xml.Linq`, `System.Text.Json`)
-
-## Planned Packages
-
-- `Gml4Net` -- planned core package
-- `Gml4Net.IO` -- planned optional I/O package for file and HTTP access
-
-## Planned API Sketch
-
-The following snippets describe the intended public API. They are design targets, not runnable examples against a published package.
+## API
 
 ### Parse GML
 
 ```csharp
-using Gml4Net;
-
-var xml = """
-    <gml:Point xmlns:gml="http://www.opengis.net/gml/3.2">
-        <gml:pos>10.0 20.0</gml:pos>
-    </gml:Point>
-    """;
+using Gml4Net.Parser;
 
 var result = GmlParser.ParseXmlString(xml);
 
@@ -51,16 +40,23 @@ if (!result.HasErrors)
 }
 ```
 
+Also available: `GmlParser.ParseBytes(ReadOnlySpan<byte>)` and `GmlParser.ParseStream(Stream)`.
+
 ### Convert to GeoJSON
 
 ```csharp
 using Gml4Net.Interop;
 
-var point = (GmlGeometry)result.Document!.Root;
 var geojson = GeoJsonBuilder.Document(result.Document!);
-// {"type": "Point", "coordinates": [10.0, 20.0]}
-
 var jsonString = GeoJsonBuilder.GeometryToJson(point);
+```
+
+Or via the generic builder pattern:
+
+```csharp
+var parser = GmlParser.Create(GeoJsonBuilder.Instance);
+var result = parser.Parse(xml);
+// result.Geometry, result.Feature, result.Collection are JsonObject
 ```
 
 ### Convert to WKT
@@ -68,9 +64,17 @@ var jsonString = GeoJsonBuilder.GeometryToJson(point);
 ```csharp
 using Gml4Net.Interop;
 
-var point = (GmlGeometry)result.Document!.Root;
 var wkt = WktBuilder.Geometry(point);
 // POINT (10 20)
+```
+
+### Convert to KML
+
+```csharp
+using Gml4Net.Interop;
+
+var kml = KmlBuilder.Feature(feature);
+var kmlString = KmlBuilder.GeometryToKml(point);
 ```
 
 ### Pattern Matching on Root Content
@@ -87,6 +91,62 @@ var description = result.Document!.Root switch
 ```
 
 ### Stream Large Feature Collections
+
+Callback-based streaming with error handling:
+
+```csharp
+using Gml4Net.Parser;
+
+var parser = new StreamingGmlParser(new StreamingParserOptions
+{
+    ErrorBehavior = StreamingErrorBehavior.Continue
+});
+
+parser.OnFeature(feature =>
+{
+    Console.WriteLine(feature.Id);
+    return ValueTask.CompletedTask;
+});
+
+parser.OnError(error =>
+{
+    Console.Error.WriteLine(error.Exception?.Message ?? "Parse issue");
+});
+
+var result = await parser.ParseAsync(stream);
+// result.FeaturesProcessed, result.FeaturesFailed
+```
+
+With builder integration:
+
+```csharp
+var result = await StreamingGml.ParseAsync(
+    stream,
+    GeoJsonBuilder.Instance,
+    feature =>
+    {
+        Console.WriteLine(feature["id"]);
+        return ValueTask.CompletedTask;
+    });
+```
+
+Batch processing:
+
+```csharp
+var result = await StreamingGml.ParseBatchesAsync(
+    stream,
+    GeoJsonBuilder.Instance,
+    batch => SaveBatchAsync(batch),
+    batchSize: 100);
+```
+
+With a feature sink (e.g. for database writes):
+
+```csharp
+var result = await StreamingGml.ParseAsync(stream, new PostGisSink(connection));
+```
+
+Low-level streaming via `IAsyncEnumerable<GmlFeature>`:
 
 ```csharp
 using Gml4Net.Parser.Streaming;
@@ -106,7 +166,6 @@ using Gml4Net.IO;
 var fileResult = GmlIo.ParseFile("data.gml");
 
 // Parse from URL
-var uri = new Uri("https://example.com/wfs?...");
 var urlResult = await GmlIo.ParseUrlAsync(uri);
 
 // Stream features from URL
@@ -116,7 +175,7 @@ await foreach (var feature in GmlIo.StreamFeaturesFromUrl(uri))
 }
 ```
 
-## Planned Supported GML Types
+## Supported GML Types
 
 ### Geometries
 
@@ -162,25 +221,13 @@ if (result.HasErrors)
 }
 ```
 
-## Planned Package Split
-
-| Package | Description |
-|---------|-------------|
-| `Gml4Net` | Planned core library: model, parser, GeoJSON/WKT interop, OWS, WCS |
-| `Gml4Net.IO` | Planned optional package: file and HTTP I/O, streaming from files and URLs |
-
 ## Docker Build and Release
 
-The repository now includes a multi-stage [Dockerfile](Dockerfile) for the planned .NET solution layout.
+The repository uses a multi-stage [Dockerfile](Dockerfile) for building, testing, and packaging.
 
-- Expected solution path by default: `GML4Net.sln`
 - Build stages: `restore`, `build`, `test`, `pack`, `push`
-- Package output stage: `artifacts`
-- Release target: `nuget.org`
-- Coverage gate in `test`: at least 90% line coverage
-- Public API XML documentation comments are required and missing comments fail the library build
-
-Example commands once the solution and projects exist:
+- Coverage gate: at least 90% line coverage
+- Public API XML documentation comments are required (`CS1591` as error)
 
 ```bash
 docker buildx build --target test -t gml4net:test .

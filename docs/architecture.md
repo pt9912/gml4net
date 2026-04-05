@@ -1,6 +1,6 @@
 # Gml4Net: Architektur
 
-Aktueller Stand: Design Phase. Dieses Dokument beschreibt die Zielarchitektur, nicht eine bereits implementierte Codebasis.
+Aktueller Stand: Implementiert. Dieses Dokument beschreibt die Architektur der bestehenden Codebasis.
 
 ## Architekturziele
 
@@ -32,8 +32,8 @@ Zusaetzliche Architekturentscheidungen:
   WFS-/FeatureCollection-Dokumente bereitgestellt, nicht als generische
   Dokument-API
 - Coverage-XML-Erzeugung (Schreiben) wird im Core unterstuetzt
-- spaetere Builder (KML, CSV, CoverageJSON) werden ueber ein generisches
-  `IGmlBuilder<TGeometry, TFeature, TCollection>` Interface angebunden
+- KML, CSV und weitere Builder werden ueber das generische
+  `IBuilder<TGeometry, TFeature, TCollection>` Interface angebunden
 
 ---
 
@@ -67,6 +67,8 @@ Zusaetzliche Architekturentscheidungen:
 │                     Versionserkennung)                               │
 │                                                                      │
 │   GmlFeatureStreamParser (XmlReader-basiert, IAsyncEnumerable)      │
+│   StreamingGmlParser (oeffentliche Callback-API)                   │
+│   StreamingGml (Convenience: Builder + Sink + Batch)               │
 └──────────────────┬──────────────────────────────────────────────────┘
                    │
                    ▼
@@ -177,21 +179,45 @@ Geeignet fuer kleine und mittlere Dokumente (< 50 MB).
 
 #### 2.2 Streaming-Pfad
 
-Der `GmlFeatureStreamParser` ist kein generischer Ersatz fuer den DOM-Pfad,
-sondern ein spezialisierter Pfad fuer grosse FeatureCollections:
+Der Streaming-Pfad besteht aus drei Schichten:
+
+**Low-Level:** `GmlFeatureStreamParser` (internal) -- kein generischer Ersatz
+fuer den DOM-Pfad, sondern ein spezialisierter Pfad fuer grosse
+FeatureCollections:
 
 - basiert auf `XmlReader` (forward-only, konstanter Speicher)
 - erkennt `featureMember` / `member` / `featureMembers` Grenzen
 - liest einzelne Feature-Elemente per `XElement.ReadFrom()` als DOM-Fragment
 - uebergibt Fragmente an denselben `GeometryParser` / `FeatureParser`
-- gibt Features via `IAsyncEnumerable<GmlFeature>` zurueck
+- `ParseAsync()` gibt Features via `IAsyncEnumerable<GmlFeature>` zurueck
+- `ParseItemsAsync()` gibt `FeatureStreamItem` zurueck (mit recoverable/fatal
+  Fehlerunterscheidung)
+
+**Oeffentliche API:** `StreamingGmlParser` -- Callback-basierte API mit
+Fehlerbehandlung pro Feature:
 
 ```csharp
-await foreach (var feature in GmlFeatureStreamParser.ParseAsync(stream))
+var parser = new StreamingGmlParser(new StreamingParserOptions
 {
-    // Jedes Feature wird einzeln verarbeitet,
-    // Speicher bleibt konstant
-}
+    ErrorBehavior = StreamingErrorBehavior.Continue
+});
+parser.OnFeature(feature => { /* ... */ return ValueTask.CompletedTask; });
+parser.OnError(error => { /* ... */ });
+var result = await parser.ParseAsync(stream);
+```
+
+**Convenience:** `StreamingGml` -- statische Methoden fuer Builder-Integration,
+Batch-Verarbeitung und Feature-Sinks:
+
+```csharp
+// Mit Builder
+await StreamingGml.ParseAsync(stream, builder, onFeature);
+
+// Batch-Verarbeitung
+await StreamingGml.ParseBatchesAsync(stream, builder, onBatch, batchSize: 100);
+
+// Mit Sink (z.B. DB-Insert)
+await StreamingGml.ParseAsync(stream, sink);
 ```
 
 **Wiederverwendung:** Streaming- und DOM-Pfad teilen sich `GeometryParser`,
@@ -389,36 +415,29 @@ zentral in `XmlHelpers` gebundelt:
 
 Der Interop-Layer uebersetzt das Domain-Modell in nutzbare Zielformate.
 
-**Core-Builder (statisch, im Hauptpaket):**
+**Builder (statisch + ueber Interface):**
 
-| Builder | Eingabe | Ausgabe |
-|---|---|---|
-| `GeoJsonBuilder` | Geometry, Feature, FeatureCollection | `JsonObject` / JSON-String |
-| `WktBuilder` | Geometry | WKT-String |
+| Builder | Eingabe | Ausgabe | `IBuilder` |
+|---|---|---|---|
+| `GeoJsonBuilder` | Geometry, Feature, FeatureCollection | `JsonObject` / JSON-String | ja |
+| `WktBuilder` | Geometry, Feature | WKT-String | ja |
+| `KmlBuilder` | Geometry, Feature, FeatureCollection | `XElement` / KML-String | ja |
+| `CsvBuilder` | FeatureCollection | CSV-String (WKT-Geometriespalte) | nein (statisch) |
 
-**Erweiterbare Builder (ueber Interface):**
+**Generisches Builder-Interface:**
 
 ```csharp
-public interface IGmlBuilder<TGeometry, TFeature, TCollection>
+public interface IBuilder<TGeometry, TFeature, TCollection>
 {
     TGeometry? BuildPoint(GmlPoint point);
-    TGeometry? BuildLineString(GmlLineString lineString);
-    TGeometry? BuildLinearRing(GmlLinearRing linearRing);
-    TGeometry? BuildPolygon(GmlPolygon polygon);
-    TGeometry? BuildMultiPoint(GmlMultiPoint multiPoint);
-    TGeometry? BuildMultiLineString(GmlMultiLineString multiLineString);
-    TGeometry? BuildMultiPolygon(GmlMultiPolygon multiPolygon);
-    TGeometry? BuildEnvelope(GmlEnvelope envelope);
-    TGeometry? BuildBox(GmlBox box);
-    TGeometry? BuildCurve(GmlCurve curve);
-    TGeometry? BuildSurface(GmlSurface surface);
+    // ... (11 Geometrie-Methoden)
     TFeature BuildFeature(GmlFeature feature);
     TCollection BuildFeatureCollection(GmlFeatureCollection fc);
-    object? BuildCoverage(GmlCoverage coverage);
+    TFeature? BuildCoverage(GmlCoverage coverage);
 }
 ```
 
-Geplante Builder-Implementierungen: KML, CSV, CIS JSON, CoverageJSON.
+Zurueckgestellt: CIS JSON, CoverageJSON.
 
 Der Builder-Layer konsumiert das Core-Modell. Er formt nicht die Parse-API und
 kennt keine Transportquellen.
@@ -476,7 +495,7 @@ Parse-Fehler).
 GML4Net/
 ├── src/
 │   ├── Gml4Net/                              # Core-Library
-│   │   ├── Gml4Net.csproj                   # net8.0, keine externen Deps
+│   │   ├── Gml4Net.csproj                   # net10.0, keine externen Deps
 │   │   ├── Model/
 │   │   │   ├── GmlNode.cs
 │   │   │   ├── GmlDocument.cs
@@ -507,11 +526,20 @@ GML4Net/
 │   │   │   ├── CoverageParser.cs            # internal static
 │   │   │   ├── XmlHelpers.cs                # internal static
 │   │   │   └── Streaming/
-│   │   │       └── GmlFeatureStreamParser.cs
+│   │   │       ├── GmlFeatureStreamParser.cs # Low-Level XmlReader-Streaming
+│   │   │       ├── FeatureStreamItem.cs      # internal, error-aware Item
+│   │   │       ├── StreamingGmlParser.cs     # public Callback-API
+│   │   │       ├── StreamingGml.cs           # public Convenience (Builder/Sink/Batch)
+│   │   │       ├── StreamingParserOptions.cs # Optionen + ErrorBehavior
+│   │   │       ├── StreamingResult.cs        # Zaehler + Progress
+│   │   │       └── StreamingError.cs         # Fehler-Transport
 │   │   ├── Interop/
-│   │   │   ├── GeoJsonBuilder.cs            # public static
-│   │   │   ├── WktBuilder.cs                # public static
-│   │   │   └── IGmlBuilder.cs               # public interface
+│   │   │   ├── IBuilder.cs                  # public interface
+│   │   │   ├── IFeatureSink.cs              # Sink-Vertrag fuer Streaming
+│   │   │   ├── GeoJsonBuilder.cs
+│   │   │   ├── WktBuilder.cs
+│   │   │   ├── KmlBuilder.cs
+│   │   │   └── CsvBuilder.cs               # static, kein IBuilder
 │   │   ├── Ows/
 │   │   │   └── OwsException.cs              # Modelle + Parser
 │   │   ├── Wcs/
@@ -586,9 +614,9 @@ explizit `T?`. Der Compiler prueft alle Zugriffe auf `null`-Sicherheit.
 
 ### Target Framework
 
-- Primaer: `net8.0` (LTS bis November 2026)
+- Primaer: `net10.0` (LTS)
 - Alle modernen C#-Features verfuegbar: sealed hierarchy, pattern matching,
-  `IAsyncEnumerable`, `Span<T>`, `required`, `init`
+  `IAsyncEnumerable`, `Span<T>`, `required`, `init`, primary constructors
 
 ---
 
@@ -624,7 +652,8 @@ tests/Gml4Net.Tests/
 │   ├── GeoJsonBuilderTests.cs
 │   └── WktBuilderTests.cs
 ├── Streaming/
-│   └── StreamParserTests.cs
+│   ├── StreamParserTests.cs
+│   └── StreamingGmlParserTests.cs
 ├── Ows/
 │   └── OwsExceptionTests.cs
 ├── Wcs/
