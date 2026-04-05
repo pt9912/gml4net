@@ -96,6 +96,7 @@ public static class StreamingGml
                     var built = builder.BuildFeature(item.Feature!);
                     batch.Add(built);
                 }
+                catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
                     failed++;
@@ -107,13 +108,14 @@ public static class StreamingGml
                         CanContinue = true
                     });
 
+                    opts.Progress?.Report(new StreamingProgress(processed, failed));
+
                     if (opts.ErrorBehavior == StreamingErrorBehavior.Stop)
                     {
                         stopped = true;
                         break;
                     }
 
-                    opts.Progress?.Report(new StreamingProgress(processed, failed));
                     continue;
                 }
 
@@ -124,6 +126,7 @@ public static class StreamingGml
                         await onBatch(batch).ConfigureAwait(false);
                         processed += batch.Count;
                     }
+                    catch (OperationCanceledException) { throw; }
                     catch (Exception ex)
                     {
                         failed += batch.Count;
@@ -135,6 +138,8 @@ public static class StreamingGml
 
                         if (opts.ErrorBehavior == StreamingErrorBehavior.Stop)
                         {
+                            // Already counted as failed above; clear to prevent
+                            // double-counting in the pending check after the loop.
                             batch.Clear();
                             stopped = true;
                             break;
@@ -181,6 +186,7 @@ public static class StreamingGml
                     await onBatch(batch).ConfigureAwait(false);
                     processed += batch.Count;
                 }
+                catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
                     failed += batch.Count;
@@ -229,6 +235,7 @@ public static class StreamingGml
                     await sink.WriteFeatureAsync(item.Feature!, ct).ConfigureAwait(false);
                     processed++;
                 }
+                catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
                     failed++;
@@ -239,6 +246,8 @@ public static class StreamingGml
                         FeatureId = item.Feature!.Id,
                         CanContinue = true
                     });
+
+                    opts.Progress?.Report(new StreamingProgress(processed, failed));
 
                     if (opts.ErrorBehavior == StreamingErrorBehavior.Stop)
                     {
@@ -256,6 +265,8 @@ public static class StreamingGml
                     Issues = item.Issues,
                     CanContinue = item.CanContinue
                 });
+
+                opts.Progress?.Report(new StreamingProgress(processed, failed));
 
                 if (!item.CanContinue || opts.ErrorBehavior == StreamingErrorBehavior.Stop)
                 {

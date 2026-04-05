@@ -93,6 +93,7 @@ public sealed class StreamingGmlParser
                             await _onFeature(item.Feature!).ConfigureAwait(false);
                             processed++;
                         }
+                        catch (OperationCanceledException) { throw; }
                         catch (Exception ex)
                         {
                             failed++;
@@ -103,6 +104,8 @@ public sealed class StreamingGmlParser
                                 FeatureId = item.Feature!.Id,
                                 CanContinue = true
                             });
+
+                            _options.Progress?.Report(new StreamingProgress(processed, failed));
 
                             if (_options.ErrorBehavior == StreamingErrorBehavior.Stop)
                                 break;
@@ -122,6 +125,8 @@ public sealed class StreamingGmlParser
                         Issues = item.Issues,
                         CanContinue = item.CanContinue
                     });
+
+                    _options.Progress?.Report(new StreamingProgress(processed, failed));
 
                     if (!item.CanContinue || _options.ErrorBehavior == StreamingErrorBehavior.Stop)
                         break;
