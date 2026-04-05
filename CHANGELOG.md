@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-04-05
+
+### Added
+
+- Public streaming API for large GML/WFS documents:
+  - `StreamingGmlParser` -- callback-based parser with `OnFeature`/`OnError`/`OnEnd`
+  - `StreamingGml.ParseAsync` -- convenience for builder-integrated streaming
+  - `StreamingGml.ParseBatchesAsync` -- batch processing with configurable batch size
+  - `StreamingGml.ParseAsync` with `IFeatureSink` -- sink-based streaming for DB inserts or file writes
+  - `StreamingParserOptions` with `ErrorBehavior` (Stop/Continue) and `IProgress<StreamingProgress>`
+  - `StreamingResult` with `FeaturesProcessed`/`FeaturesFailed` counters
+  - `StreamingError` with structured diagnostics per feature failure
+  - `IFeatureSink` contract with `WriteFeatureAsync`/`CompleteAsync` lifecycle
+- Generic parser: `GmlParser<TGeometry, TFeature, TCollection>` with `GmlBuildResult`
+- `GmlParser.Create(builder)` factory method for type-inferred parser creation
+- `BuilderExtensions.BuildGeometry()` extension for geometry dispatch on `IBuilder`
+- Error-aware low-level streaming via `ParseItemsAsync` with recoverable/fatal error distinction
+
+### Changed
+
+- Rename `IGmlBuilder<TGeometry, TFeature, TCollection>` to `IBuilder<TGeometry, TFeature, TCollection>` (**breaking**)
+- Change `IBuilder.BuildCoverage` return type from `object?` to `TFeature?` (**breaking**)
+
+### Documentation
+
+- Update README to reflect all implemented features and new streaming API
+- Update architecture.md and roadmap.md to current state
+- Remove pseudo-code from builder.md and streaming-parser.md (replaced with source references)
+
 ## [0.1.2] - 2026-04-04
 
 ### Fixed
