@@ -1,6 +1,6 @@
 # Streaming-Pfad fuer grosse GML-Dokumente
 
-Status: Zielbild fuer die oeffentliche Streaming-API.
+Status: Implementiert.
 
 Hinweis: Ein Low-Level-Streaming-Pfad existiert bereits ueber
 `GmlFeatureStreamParser`. Dieses Dokument beschreibt die gewuenschte
@@ -493,17 +493,17 @@ var result = await parser.ParseAsync(input);
 
 ## Vergleich
 
-| Aspekt | GmlParser<,,> | StreamingGmlParser |
-|---|---|---|
-| API-Form | generisch | nicht-generisch |
-| Eingabe | string, byte[], Stream | Stream |
-| Verarbeitung | DOM, alles im Speicher | forward-only, pro Feature |
-| Rueckgabe | `GmlBuildResult` | `StreamingResult` |
-| Builder/Sink | direkter Teil des Parser-Typs | optional ueber Convenience-Overloads oder `IFeatureSink` |
-| Root-Typen | Geometry, Feature, Collection, Coverage | FeatureCollection |
-| Fehler | Issues im Result | Error-Callback plus Result-Zaehler |
-| Fortschritt | - | `IProgress<StreamingProgress>` |
-| Basis | `GmlParser.Parse...()` | `GmlFeatureStreamParser.ParseItemsAsync()` intern, `ParseAsync()` als Success-only Convenience |
+| Aspekt       | GmlParser<,,>                           | StreamingGmlParser                                                                             |
+| ------------ | --------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| API-Form     | generisch                               | nicht-generisch                                                                                |
+| Eingabe      | string, byte[], Stream                  | Stream                                                                                         |
+| Verarbeitung | DOM, alles im Speicher                  | forward-only, pro Feature                                                                      |
+| Rueckgabe    | `GmlBuildResult`                        | `StreamingResult`                                                                              |
+| Builder/Sink | direkter Teil des Parser-Typs           | optional ueber Convenience-Overloads oder `IFeatureSink`                                       |
+| Root-Typen   | Geometry, Feature, Collection, Coverage | FeatureCollection                                                                              |
+| Fehler       | Issues im Result                        | Error-Callback plus Result-Zaehler                                                             |
+| Fortschritt  | -                                       | `IProgress<StreamingProgress>`                                                                 |
+| Basis        | `GmlParser.Parse...()`                  | `GmlFeatureStreamParser.ParseItemsAsync()` intern, `ParseAsync()` als Success-only Convenience |
 
 ## Ziel-Dateien
 
@@ -513,15 +513,15 @@ nicht, dass die oeffentlichen Typen auch im Namespace
 `Gml4Net.Parser`; nur die internen Low-Level-Typen liegen in
 `Gml4Net.Parser.Streaming`.
 
-| Datei | Rolle |
-|---|---|
-| `src/Gml4Net/Parser/Streaming/GmlFeatureStreamParser.cs` | erweiteter Low-Level-Streaming-Pfad mit Item-basiertem Fehlervertrag |
-| `src/Gml4Net/Parser/Streaming/StreamingGmlParser.cs` | oeffentliche Streaming-API |
-| `src/Gml4Net/Parser/Streaming/StreamingParserOptions.cs` | Optionen und Enums |
-| `src/Gml4Net/Parser/Streaming/StreamingError.cs` | strukturierter Fehlertransport fuer Callbacks |
-| `src/Gml4Net/Parser/Streaming/StreamingResult.cs` | Zaehler und Progress-Typen |
-| `src/Gml4Net/Interop/IFeatureSink.cs` | Vertrag fuer schreibende Streaming-Sinks |
-| `tests/Gml4Net.Tests/Streaming/StreamingGmlParserTests.cs` | API- und Fehlerfall-Tests |
+| Datei                                                      | Rolle                                                                |
+| ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| `src/Gml4Net/Parser/Streaming/GmlFeatureStreamParser.cs`   | erweiteter Low-Level-Streaming-Pfad mit Item-basiertem Fehlervertrag |
+| `src/Gml4Net/Parser/Streaming/StreamingGmlParser.cs`       | oeffentliche Streaming-API                                           |
+| `src/Gml4Net/Parser/Streaming/StreamingParserOptions.cs`   | Optionen und Enums                                                   |
+| `src/Gml4Net/Parser/Streaming/StreamingError.cs`           | strukturierter Fehlertransport fuer Callbacks                        |
+| `src/Gml4Net/Parser/Streaming/StreamingResult.cs`          | Zaehler und Progress-Typen                                           |
+| `src/Gml4Net/Interop/IFeatureSink.cs`                      | Vertrag fuer schreibende Streaming-Sinks                             |
+| `tests/Gml4Net.Tests/Streaming/StreamingGmlParserTests.cs` | API- und Fehlerfall-Tests                                            |
 
 ## Testfaelle
 
