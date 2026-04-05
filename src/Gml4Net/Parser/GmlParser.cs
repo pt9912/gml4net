@@ -1,4 +1,5 @@
 using System.Xml.Linq;
+using Gml4Net.Interop;
 using Gml4Net.Model;
 using Gml4Net.Model.Feature;
 using Gml4Net.Model.Geometry;
@@ -10,6 +11,17 @@ namespace Gml4Net.Parser;
 /// </summary>
 public static class GmlParser
 {
+    /// <summary>
+    /// Creates a generic parser that combines parsing and builder dispatch in a single step.
+    /// Type parameters are inferred from the builder instance.
+    /// </summary>
+    /// <param name="builder">The builder to use for converting parsed GML to the target format.</param>
+    /// <returns>A new <see cref="GmlParser{TGeometry,TFeature,TCollection}"/> instance.</returns>
+    public static GmlParser<TGeometry, TFeature, TCollection>
+        Create<TGeometry, TFeature, TCollection>(
+            IBuilder<TGeometry, TFeature, TCollection> builder)
+        => new(builder);
+
     /// <summary>
     /// Parses a GML XML string into a <see cref="GmlParseResult"/>.
     /// </summary>
