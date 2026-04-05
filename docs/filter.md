@@ -38,7 +38,9 @@ Neues Property:
 /// Optional predicate that determines whether a successfully parsed feature
 /// should be emitted to the configured callback, batch, or sink.
 /// Features for which the predicate returns false are silently skipped
-/// and counted as filtered, not as processed or failed.
+/// and counted as filtered, not as processed or failed. If the parsed feature
+/// already carries non-fatal parser diagnostics, these diagnostics are still
+/// forwarded via the configured error callback.
 /// </summary>
 public Func<GmlFeature, bool>? Filter { get; init; }
 ```
@@ -80,12 +82,26 @@ public readonly record struct StreamingProgress(
   - nicht als `FeaturesProcessed` gezaehlt
   - nicht als `FeaturesFailed` gezaehlt
   - als `FeaturesFiltered` gezaehlt
+- traegt ein gefiltertes Feature bereits parsernahe `Issues`, werden diese trotz
+  Filterung ueber den konfigurierten Fehlerkanal weitergegeben
+  (`OnError(...)` bzw. `onError`), mit `Exception == null` und
+  `CanContinue == true`
+- diese Diagnostik-Weiterleitung ist rein informativ und unterliegt nicht dem
+  `ErrorBehavior` — sie loest kein `Stop` aus
 - `FeaturesProcessed + FeaturesFailed + FeaturesFiltered` ergibt die
-  Gesamtzahl aller Feature-Ergebnisse, die der Streaming-Pfad verarbeitet hat
+  Gesamtzahl aller bereits entschiedenen Feature-Ergebnisse, die der
+  Streaming-Pfad verarbeitet hat
+- im Batch-Pfad bleiben erfolgreich geparste und vom Filter akzeptierte, aber
+  noch nicht geflushte Features weiter pending; sie zaehlen bis zum Flush oder
+  bis zum vorzeitigen Abbruch in keinen der drei Result-Zaehler
 - `Progress` meldet nach jedem Feature-Ergebnis (inkl. gefilterter Features)
   die kumulativen Zaehler
+- im Batch-Pfad bleibt `Progress` trotzdem pro Feature-Parse-Ergebnis definiert;
+  zwischen zwei Flushes duerfen die gemeldeten Zaehler bei pending Erfolgen
+  unveraendert bleiben
 - wirft der Filter selbst eine Exception, wird das Feature als fehlgeschlagen
-  behandelt (nicht als gefiltert), und `OnError` wird aufgerufen
+  behandelt (nicht als gefiltert), und der konfigurierte Fehlerkanal
+  (`OnError(...)` bzw. `onError`) wird aufgerufen
 - wirft der Filter `OperationCanceledException`, wird diese sofort propagiert
   (nicht als Feature-Fehler gezaehlt)
 - `OnEnd` erhaelt den `StreamingResult` mit allen drei Zaehlern
@@ -102,7 +118,7 @@ GmlFeatureStreamParser.ParseItemsAsync
   v
 FeatureStreamItem
   |
-  +-- IsSuccess == false --> failed++, OnError
+  +-- IsSuccess == false --> failed++, OnError / onError
   |
   +-- IsSuccess == true
         |
@@ -112,13 +128,16 @@ FeatureStreamItem
         |   OnFeature / onBatch / WriteFeatureAsync
         |     |
         |     +-- Erfolg --> processed++
-        |     +-- Exception --> failed++, OnError
+        |     +-- Exception --> failed++, OnError / onError
         |
         +-- Filter(feature) == false --> filtered++
+        |     |
+        |     +-- item.Issues.Count > 0 --> zusaetzlich nicht-fatale
+        |           Diagnostik ueber OnError / onError
         |
         +-- Filter(feature) wirft OperationCanceledException --> propagiert sofort
         |
-        +-- Filter(feature) wirft andere Exception --> failed++, OnError
+        +-- Filter(feature) wirft andere Exception --> failed++, OnError / onError
 ```
 
 ## Im Batch-Pfad
@@ -126,8 +145,14 @@ FeatureStreamItem
 - der Filter wird pro Feature *vor* dem Hinzufuegen zum Batch ausgewertet
 - gefilterte Features landen nicht im Batch-Buffer
 - der Batch-Zaehler (`batchSize`) zaehlt nur ungefilterte Features
+- ungefilterte Features zaehlen erst dann als `FeaturesProcessed`, wenn der
+  Batch erfolgreich geflusht wurde
+- bis dahin bleiben sie pending; `Progress` darf deshalb zwischen zwei Flushes
+  denselben Zaehlerstand mehrfach melden
 - ein Batch mit 100 ungefilterten Features wird geflusht, auch wenn insgesamt
   500 Features geparst und 400 davon gefiltert wurden
+- parsernahe `Issues` eines spaeter herausgefilterten Features werden trotzdem
+  ueber den konfigurierten Fehlerkanal weitergereicht und nicht still verworfen
 
 ## Nutzung
 
@@ -221,9 +246,14 @@ Mindestens diese Faelle muessen abgedeckt sein:
 - Filter schliesst einige Features aus → korrekte Aufteilung der Zaehler
 - kein Filter gesetzt → `FeaturesFiltered == 0`, bisheriges Verhalten unveraendert
 - Filter wirft Exception → Feature als fehlgeschlagen gezaehlt, nicht als gefiltert
+- gefiltertes Feature mit parsernahen `Issues` → Diagnostik wird ueber
+  `OnError(...)` bzw. `onError` weitergereicht, aber das Feature als
+  `FeaturesFiltered` gezaehlt
 - Filter + `ErrorBehavior.Stop` → Stop nach erstem Fehler, gefilterte Zaehler korrekt
 - Filter + `ParseBatchesAsync` → Batch enthaelt nur ungefilterte Features
 - Filter + `ParseBatchesAsync` → `batchSize` zaehlt ungefilterte Features
+- Filter + `ParseBatchesAsync` → `Progress` bleibt pro Feature definiert und
+  darf zwischen zwei Flushes denselben Zaehlerstand mehrfach melden
 - Filter + `IFeatureSink` → `WriteFeatureAsync` nur fuer ungefilterte Features
 - Filter + `IFeatureSink` → `CompleteAsync` wird trotz gefilterter Features aufgerufen
 - Filter + `Progress` → meldet `FeaturesFiltered` nach jedem Ergebnis
