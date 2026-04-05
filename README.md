@@ -14,7 +14,7 @@ A .NET library for parsing Geography Markup Language (GML) documents. Supports G
 - **Coverage Support** -- RectifiedGridCoverage, GridCoverage, ReferenceableGridCoverage, MultiPointCoverage
 - **WCS Integration** -- Request builder and capabilities parser for OGC Web Coverage Service
 - **OWS Exceptions** -- Detection and parsing of OGC Web Service exception reports
-- **Streaming** -- Memory-efficient processing of large WFS feature collections with callback-based public API, batch support, and feature sinks
+- **Streaming** -- Memory-efficient processing of large WFS feature collections with callback-based public API, batch support, feature sinks, and per-feature filtering
 - **Zero Dependencies** -- Only BCL APIs (`System.Xml.Linq`, `System.Text.Json`)
 
 ## Packages
@@ -138,6 +138,21 @@ var result = await StreamingGml.ParseBatchesAsync(
     GeoJsonBuilder.Instance,
     batch => SaveBatchAsync(batch),
     batchSize: 100);
+```
+
+With a feature filter (property-based or spatial):
+
+```csharp
+var result = await StreamingGml.ParseAsync(
+    stream,
+    GeoJsonBuilder.Instance,
+    feature => ProcessAsync(feature),
+    options: new StreamingParserOptions
+    {
+        Filter = f => f.Properties.TryGetValue("status", out var v)
+                      && v is GmlStringProperty { Value: "active" }
+    });
+// result.FeaturesFiltered -- skipped features
 ```
 
 With a feature sink (e.g. for database writes):
@@ -291,6 +306,7 @@ git push origin Gml4Net.IO-v0.2.0
 - [Roadmap](docs/roadmap.md)
 - [Porting Design](docs/port2net.md)
 - [Streaming Parser](docs/streaming-parser.md)
+- [Feature Filter](docs/filter.md)
 - [Releasing](docs/releasing.md)
 
 ## Related Projects

@@ -317,7 +317,9 @@ Geometrie  Parser     Parser +   GeoJSON    WCS        + I/O      Builder
   - [x] `OnError(Action<StreamingError>)` -- pro Fehler
   - [x] `OnEnd(Action<StreamingResult>)` -- immer, auch bei Abbruch/Cancellation
   - [x] `ParseAsync(Stream, CancellationToken)` → `Task<StreamingResult>`
-  - [x] `StreamingParserOptions` mit `ErrorBehavior` (Stop/Continue) und `IProgress`
+  - [x] `StreamingParserOptions` mit `ErrorBehavior` (Stop/Continue), `IProgress`
+    und `Filter` (`Func<GmlFeature, bool>?`)
+  - [x] `FeaturesFiltered`-Zaehler auf `StreamingResult` und `StreamingProgress`
   - [x] Einmalnutzung (Single-Use), Setup-then-Run
 - [x] `StreamingGml` (Convenience):
   - [x] `ParseAsync(Stream, IBuilder, onFeature, onError?, options?, ct)` -- Builder-Integration

@@ -68,7 +68,7 @@ Zusaetzliche Architekturentscheidungen:
 │                                                                      │
 │   GmlFeatureStreamParser (XmlReader-basiert, IAsyncEnumerable)      │
 │   StreamingGmlParser (oeffentliche Callback-API)                   │
-│   StreamingGml (Convenience: Builder + Sink + Batch)               │
+│   StreamingGml (Convenience: Builder + Sink + Batch + Filter)      │
 └──────────────────┬──────────────────────────────────────────────────┘
                    │
                    ▼
@@ -194,12 +194,13 @@ FeatureCollections:
   Fehlerunterscheidung)
 
 **Oeffentliche API:** `StreamingGmlParser` -- Callback-basierte API mit
-Fehlerbehandlung pro Feature:
+Fehlerbehandlung pro Feature und optionalem Filter:
 
 ```csharp
 var parser = new StreamingGmlParser(new StreamingParserOptions
 {
-    ErrorBehavior = StreamingErrorBehavior.Continue
+    ErrorBehavior = StreamingErrorBehavior.Continue,
+    Filter = f => f.Id?.StartsWith("building.") == true
 });
 parser.OnFeature(feature => { /* ... */ return ValueTask.CompletedTask; });
 parser.OnError(error => { /* ... */ });
@@ -529,7 +530,7 @@ GML4Net/
 │   │   │       ├── GmlFeatureStreamParser.cs # Low-Level XmlReader-Streaming
 │   │   │       ├── FeatureStreamItem.cs      # internal, error-aware Item
 │   │   │       ├── StreamingGmlParser.cs     # public Callback-API
-│   │   │       ├── StreamingGml.cs           # public Convenience (Builder/Sink/Batch)
+│   │   │       ├── StreamingGml.cs           # public Convenience (Builder/Sink/Batch/Filter)
 │   │   │       ├── StreamingParserOptions.cs # Optionen + ErrorBehavior
 │   │   │       ├── StreamingResult.cs        # Zaehler + Progress
 │   │   │       └── StreamingError.cs         # Fehler-Transport
