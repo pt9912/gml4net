@@ -58,6 +58,43 @@ public static class GmlFeatureStreamParser
     {
         ArgumentNullException.ThrowIfNull(reader);
 
+        await foreach (var item in ParseItemsCore(reader, ct).ConfigureAwait(false))
+        {
+            if (item.IsSuccess)
+                yield return item.Feature!;
+            else if (!item.CanContinue)
+                throw item.Exception ?? new InvalidOperationException("Fatal streaming parse error.");
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously streams feature parse results including error information.
+    /// Used internally by <see cref="StreamingGmlParser"/> for error-aware streaming.
+    /// </summary>
+    internal static async IAsyncEnumerable<FeatureStreamItem> ParseItemsAsync(
+        Stream stream,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        using var reader = CreateReader(stream);
+
+        await foreach (var item in ParseItemsCore(reader, ct).ConfigureAwait(false))
+        {
+            yield return item;
+        }
+    }
+
+    /// <summary>
+    /// Core implementation that yields <see cref="FeatureStreamItem"/> for each
+    /// feature parse attempt. Recoverable errors produce items with
+    /// <see cref="FeatureStreamItem.CanContinue"/> = true; fatal errors produce
+    /// items with CanContinue = false.
+    /// </summary>
+    private static async IAsyncEnumerable<FeatureStreamItem> ParseItemsCore(
+        XmlReader reader,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
         var version = GmlVersion.V3_2;
         var versionDetected = false;
         var processCurrentElement = reader.NodeType == XmlNodeType.Element;
@@ -84,20 +121,18 @@ public static class GmlFeatureStreamParser
                     && reader.NodeType == XmlNodeType.Element
                     && !IsGmlOrWfsElement(reader))
                 {
-                    var featureEl = (XElement)await XNode.ReadFromAsync(reader, ct).ConfigureAwait(false);
-                    var effectiveVersion = XmlHelpers.DetectVersion(featureEl, version);
-                    var issues = new List<GmlParseIssue>();
-                    var feature = FeatureParser.ParseFeature(featureEl, effectiveVersion, issues);
-                    if (feature is not null)
-                        yield return feature;
+                    var (featureEl, fatalError) = await TryReadFragmentAsync(reader, ct).ConfigureAwait(false);
+                    if (fatalError is not null)
+                    {
+                        yield return fatalError;
+                        yield break;
+                    }
+
+                    yield return ParseFeatureElement(featureEl!, version);
                 }
             }
             else if (IsFeatureMembersElement(reader))
             {
-                // featureMembers (plural): children are feature elements directly.
-                // Iterate with forward-only reader keeping memory constant.
-                // Key: after XNode.ReadFromAsync the reader is already on the next
-                // node, so we must NOT call ReadAsync again before checking it.
                 var membersDepth = reader.Depth;
                 var alreadyPositioned = false;
 
@@ -106,7 +141,6 @@ public static class GmlFeatureStreamParser
                     alreadyPositioned = false;
                     ct.ThrowIfCancellationRequested();
 
-                    // End of featureMembers
                     if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == membersDepth)
                         break;
 
@@ -114,18 +148,77 @@ public static class GmlFeatureStreamParser
                         && reader.Depth == membersDepth + 1
                         && !IsGmlOrWfsElement(reader))
                     {
-                        var featureEl = (XElement)await XNode.ReadFromAsync(reader, ct).ConfigureAwait(false);
-                        var effectiveVersion = XmlHelpers.DetectVersion(featureEl, version);
-                        var issues = new List<GmlParseIssue>();
-                        var feature = FeatureParser.ParseFeature(featureEl, effectiveVersion, issues);
-                        if (feature is not null)
-                            yield return feature;
+                        var (featureEl, fatalError) = await TryReadFragmentAsync(reader, ct).ConfigureAwait(false);
+                        if (fatalError is not null)
+                        {
+                            yield return fatalError;
+                            yield break;
+                        }
+
+                        yield return ParseFeatureElement(featureEl!, version);
 
                         // ReadFromAsync positioned the reader on the next node already
                         alreadyPositioned = true;
                     }
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Tries to read an XML fragment. Returns the element on success, or a fatal
+    /// <see cref="FeatureStreamItem"/> on failure. OperationCanceledException is
+    /// not caught and propagates to the caller.
+    /// </summary>
+    private static async Task<(XElement? Element, FeatureStreamItem? FatalError)> TryReadFragmentAsync(
+        XmlReader reader, CancellationToken ct)
+    {
+        try
+        {
+            var element = (XElement)await XNode.ReadFromAsync(reader, ct).ConfigureAwait(false);
+            return (element, null);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            return (null, new FeatureStreamItem { Exception = ex, CanContinue = false });
+        }
+    }
+
+    /// <summary>
+    /// Parses a materialized feature XElement into a <see cref="FeatureStreamItem"/>.
+    /// Since the fragment is already read, any error here is recoverable.
+    /// </summary>
+    private static FeatureStreamItem ParseFeatureElement(XElement featureEl, GmlVersion version)
+    {
+        var effectiveVersion = XmlHelpers.DetectVersion(featureEl, version);
+        var issues = new List<GmlParseIssue>();
+
+        try
+        {
+            var feature = FeatureParser.ParseFeature(featureEl, effectiveVersion, issues);
+            if (feature is not null)
+                return new FeatureStreamItem { Feature = feature, Issues = issues, CanContinue = true };
+
+            return new FeatureStreamItem
+            {
+                Issues = issues.Count > 0 ? issues : [new GmlParseIssue
+                {
+                    Severity = GmlIssueSeverity.Error,
+                    Code = "feature_parse_null",
+                    Message = "FeatureParser returned null without reporting issues."
+                }],
+                CanContinue = true
+            };
+        }
+        catch (Exception ex)
+        {
+            return new FeatureStreamItem
+            {
+                Exception = ex,
+                Issues = issues,
+                CanContinue = true
+            };
         }
     }
 
