@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-04-05
+
+### Added
+
+- Multi-target framework support: NuGet packages now contain `lib/net8.0/`, `lib/net9.0/`, and `lib/net10.0/`
+
+### Changed
+
+- Library projects (`Gml4Net`, `Gml4Net.IO`) target `net8.0;net9.0;net10.0` instead of `net10.0` only (**breaking** for consumers pinned to a single-target package layout)
+
 ## [0.2.0] - 2026-04-05
 
 ### Added

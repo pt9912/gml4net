@@ -162,3 +162,4 @@ veroeffentlichte Paket die alte CHANGELOG.
 | 0.1.3 | 2026-04-05 | Gml4Net, Gml4Net.IO | Streaming Public API, generischer Parser, IBuilder Rename |
 | 0.1.4 | 2026-04-05 | Gml4Net, Gml4Net.IO | Fix Related Projects Links in README |
 | 0.2.0 | 2026-04-05 | Gml4Net, Gml4Net.IO | Feature-Filter fuer Streaming-Pfad, Breaking: StreamingProgress 3 Parameter |
+| 0.3.0 | 2026-04-05 | Gml4Net, Gml4Net.IO | Multi-Target: net8.0, net9.0, net10.0 |
