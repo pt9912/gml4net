@@ -116,6 +116,9 @@ Vertragsregeln fuer `StreamingGmlParser`:
 - `OnEnd(...)` ist fuer Abschlusslogik auf Aufruferseite gedacht, z. B. fuer
   einen letzten synchronen Buffer-Flush oder das Finalisieren lokaler
   Aggregation nach dem letzten Feature
+- `OnEnd(...)` wird immer genau einmal aufgerufen, auch bei fatalem Abbruch
+  oder Cancellation; der uebergebene `StreamingResult` enthaelt dann die
+  Zaehler zum Zeitpunkt des Abbruchs
 - `OnEnd(...)` liefert bewusst denselben `StreamingResult` wie der Rueckgabewert
   von `ParseAsync(...)`, damit Abschlusslogik ohne zusaetzlichen Zustand direkt
   auf den Endzaehlern arbeiten kann
@@ -674,7 +677,8 @@ Mindestens diese Faelle muessen abgedeckt sein:
 - ruft `OnFeature` ohne versteckte Batch-Verzoegerung auf
 - `ParseAsync(...)` ohne registriertes `OnFeature(...)` zaehlt erfolgreiche
   Features, ohne sie weiterzureichen
-- `OnEnd(...)` wird genau einmal aufgerufen
+- `OnEnd(...)` wird immer genau einmal aufgerufen, auch bei fatalem Abbruch
+  oder Cancellation
 - `OnEnd(...)` erhaelt denselben `StreamingResult` wie der Rueckgabewert von
   `ParseAsync(...)`
 - `IProgress<StreamingProgress>` meldet nach jedem Feature-Ergebnis die
