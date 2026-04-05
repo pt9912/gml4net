@@ -234,6 +234,7 @@ public static class StreamingGml
                 {
                     await sink.WriteFeatureAsync(item.Feature!, ct).ConfigureAwait(false);
                     processed++;
+                    opts.Progress?.Report(new StreamingProgress(processed, failed));
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
@@ -274,8 +275,6 @@ public static class StreamingGml
                     break;
                 }
             }
-
-            opts.Progress?.Report(new StreamingProgress(processed, failed));
         }
 
         if (!stopped)

@@ -92,6 +92,7 @@ public sealed class StreamingGmlParser
                         {
                             await _onFeature(item.Feature!).ConfigureAwait(false);
                             processed++;
+                            _options.Progress?.Report(new StreamingProgress(processed, failed));
                         }
                         catch (OperationCanceledException) { throw; }
                         catch (Exception ex)
@@ -114,6 +115,7 @@ public sealed class StreamingGmlParser
                     else
                     {
                         processed++;
+                        _options.Progress?.Report(new StreamingProgress(processed, failed));
                     }
                 }
                 else
@@ -131,8 +133,6 @@ public sealed class StreamingGmlParser
                     if (!item.CanContinue || _options.ErrorBehavior == StreamingErrorBehavior.Stop)
                         break;
                 }
-
-                _options.Progress?.Report(new StreamingProgress(processed, failed));
             }
         }
         catch (Exception ex)
