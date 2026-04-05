@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-04-05
+
+### Added
+
+- Feature filter for the streaming path:
+  - `StreamingParserOptions.Filter` -- `Func<GmlFeature, bool>?` predicate evaluated before callback/builder/sink
+  - `StreamingResult.FeaturesFiltered` -- counter for features excluded by the filter
+  - `StreamingProgress.FeaturesFiltered` -- cumulative filtered count in progress reports
+  - Filter works on raw `GmlFeature`, before builder transformation
+  - Filter exceptions counted as failed; `OperationCanceledException` propagated immediately
+  - Non-fatal diagnostics on filtered features forwarded via error callback (informational, does not trigger Stop)
+  - Filter supported in all streaming paths: `StreamingGmlParser`, `StreamingGml.ParseAsync`, `ParseBatchesAsync`, and sink
+
+### Changed
+
+- `StreamingProgress` now has three positional parameters (`FeaturesProcessed`, `FeaturesFailed`, `FeaturesFiltered`) (**breaking**)
+
+### Fixed
+
+- Report Progress after post-loop batch flush/pending to ensure final `StreamingProgress` matches `StreamingResult`
+
+### Documentation
+
+- Add feature filter design doc (`docs/filter.md`)
+- Update README, architecture.md and roadmap.md with filter feature
+- Update streaming-parser.md status to Implementiert
+
 ## [0.1.4] - 2026-04-05
 
 ### Fixed
