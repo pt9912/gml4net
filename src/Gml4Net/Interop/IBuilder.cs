@@ -10,7 +10,7 @@ namespace Gml4Net.Interop;
 /// <typeparam name="TGeometry">Output type for geometry conversions.</typeparam>
 /// <typeparam name="TFeature">Output type for feature conversions.</typeparam>
 /// <typeparam name="TCollection">Output type for feature collection conversions.</typeparam>
-public interface IGmlBuilder<TGeometry, TFeature, TCollection>
+public interface IBuilder<TGeometry, TFeature, TCollection>
 {
     /// <summary>Builds a Point.</summary>
     TGeometry? BuildPoint(GmlPoint point);
@@ -39,5 +39,5 @@ public interface IGmlBuilder<TGeometry, TFeature, TCollection>
     /// <summary>Builds a FeatureCollection.</summary>
     TCollection BuildFeatureCollection(GmlFeatureCollection fc);
     /// <summary>Builds a Coverage.</summary>
-    object? BuildCoverage(GmlCoverage coverage);
+    TFeature? BuildCoverage(GmlCoverage coverage);
 }

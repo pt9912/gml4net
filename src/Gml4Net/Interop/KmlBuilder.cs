@@ -9,17 +9,17 @@ namespace Gml4Net.Interop;
 
 /// <summary>
 /// Converts GML model objects to KML (Keyhole Markup Language) XML.
-/// Implements <see cref="IGmlBuilder{TGeometry,TFeature,TCollection}"/> and also
+/// Implements <see cref="IBuilder{TGeometry,TFeature,TCollection}"/> and also
 /// provides static convenience methods via <see cref="Instance"/>.
 /// </summary>
-public sealed class KmlBuilder : IGmlBuilder<XElement, XElement, XElement>
+public sealed class KmlBuilder : IBuilder<XElement, XElement, XElement>
 {
     private static readonly XNamespace Kml = "http://www.opengis.net/kml/2.2";
 
     /// <summary>Shared default instance.</summary>
     public static KmlBuilder Instance { get; } = new();
 
-    // ---- IGmlBuilder implementation ----
+    // ---- IBuilder implementation ----
 
     /// <inheritdoc />
     public XElement? BuildPoint(GmlPoint point) { ArgumentNullException.ThrowIfNull(point); return BuildPointCore(point); }
@@ -48,7 +48,7 @@ public sealed class KmlBuilder : IGmlBuilder<XElement, XElement, XElement>
     /// <inheritdoc />
     public XElement BuildFeatureCollection(GmlFeatureCollection fc) => FeatureCollection(fc);
     /// <inheritdoc />
-    public object? BuildCoverage(GmlCoverage coverage) => null;
+    public XElement? BuildCoverage(GmlCoverage coverage) => null;
 
     // ---- Static convenience API (backward compatible) ----
 

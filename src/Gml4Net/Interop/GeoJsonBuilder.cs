@@ -8,15 +8,15 @@ namespace Gml4Net.Interop;
 
 /// <summary>
 /// Converts GML model objects to GeoJSON using <see cref="System.Text.Json.Nodes"/>.
-/// Implements <see cref="IGmlBuilder{TGeometry,TFeature,TCollection}"/> and also
+/// Implements <see cref="IBuilder{TGeometry,TFeature,TCollection}"/> and also
 /// provides static convenience methods via <see cref="Instance"/>.
 /// </summary>
-public sealed class GeoJsonBuilder : IGmlBuilder<JsonObject, JsonObject, JsonObject>
+public sealed class GeoJsonBuilder : IBuilder<JsonObject, JsonObject, JsonObject>
 {
     /// <summary>Shared default instance.</summary>
     public static GeoJsonBuilder Instance { get; } = new();
 
-    // ---- IGmlBuilder implementation ----
+    // ---- IBuilder implementation ----
 
     /// <inheritdoc />
     public JsonObject? BuildPoint(GmlPoint point) { ArgumentNullException.ThrowIfNull(point); return BuildPointCore(point); }
@@ -45,7 +45,7 @@ public sealed class GeoJsonBuilder : IGmlBuilder<JsonObject, JsonObject, JsonObj
     /// <inheritdoc />
     public JsonObject BuildFeatureCollection(GmlFeatureCollection fc) => FeatureCollection(fc);
     /// <inheritdoc />
-    public object? BuildCoverage(GmlCoverage coverage) => null;
+    public JsonObject? BuildCoverage(GmlCoverage coverage) => null;
 
     // ---- Static convenience API (backward compatible) ----
 

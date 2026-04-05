@@ -8,15 +8,15 @@ namespace Gml4Net.Interop;
 
 /// <summary>
 /// Converts GML geometry objects to Well-Known Text (WKT) strings.
-/// Implements <see cref="IGmlBuilder{TGeometry,TFeature,TCollection}"/> and also
+/// Implements <see cref="IBuilder{TGeometry,TFeature,TCollection}"/> and also
 /// provides static convenience methods via <see cref="Instance"/>.
 /// </summary>
-public sealed class WktBuilder : IGmlBuilder<string, string, string>
+public sealed class WktBuilder : IBuilder<string, string, string>
 {
     /// <summary>Shared default instance.</summary>
     public static WktBuilder Instance { get; } = new();
 
-    // ---- IGmlBuilder implementation ----
+    // ---- IBuilder implementation ----
 
     /// <inheritdoc />
     public string? BuildPoint(GmlPoint point) { ArgumentNullException.ThrowIfNull(point); return BuildPointCore(point); }
@@ -58,7 +58,7 @@ public sealed class WktBuilder : IGmlBuilder<string, string, string>
     }
 
     /// <inheritdoc />
-    public object? BuildCoverage(GmlCoverage coverage) => null;
+    public string? BuildCoverage(GmlCoverage coverage) => null;
 
     // ---- Static convenience API (backward compatible) ----
 

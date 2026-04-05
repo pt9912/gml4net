@@ -9,12 +9,12 @@ using Xunit;
 
 namespace Gml4Net.Tests.Interop;
 
-public class IGmlBuilderTests
+public class IBuilderTests
 {
     [Fact]
-    public void GeoJsonBuilder_ImplementsIGmlBuilder()
+    public void GeoJsonBuilder_ImplementsIBuilder()
     {
-        IGmlBuilder<JsonObject, JsonObject, JsonObject> builder = GeoJsonBuilder.Instance;
+        IBuilder<JsonObject, JsonObject, JsonObject> builder = GeoJsonBuilder.Instance;
 
         var pt = new GmlPoint { Coordinate = new GmlCoordinate(1, 2) };
         var result = builder.BuildPoint(pt);
@@ -24,9 +24,9 @@ public class IGmlBuilderTests
     }
 
     [Fact]
-    public void WktBuilder_ImplementsIGmlBuilder()
+    public void WktBuilder_ImplementsIBuilder()
     {
-        IGmlBuilder<string, string, string> builder = WktBuilder.Instance;
+        IBuilder<string, string, string> builder = WktBuilder.Instance;
 
         var pt = new GmlPoint { Coordinate = new GmlCoordinate(1, 2) };
         var result = builder.BuildPoint(pt);
@@ -35,9 +35,9 @@ public class IGmlBuilderTests
     }
 
     [Fact]
-    public void KmlBuilder_ImplementsIGmlBuilder()
+    public void KmlBuilder_ImplementsIBuilder()
     {
-        IGmlBuilder<XElement, XElement, XElement> builder = KmlBuilder.Instance;
+        IBuilder<XElement, XElement, XElement> builder = KmlBuilder.Instance;
 
         var pt = new GmlPoint { Coordinate = new GmlCoordinate(1, 2) };
         var result = builder.BuildPoint(pt);
@@ -64,17 +64,17 @@ public class IGmlBuilderTests
         };
 
         // GeoJSON
-        IGmlBuilder<JsonObject, JsonObject, JsonObject> geojson = GeoJsonBuilder.Instance;
+        IBuilder<JsonObject, JsonObject, JsonObject> geojson = GeoJsonBuilder.Instance;
         var gj = geojson.BuildFeature(feature);
         gj["type"]!.GetValue<string>().Should().Be("Feature");
 
         // WKT
-        IGmlBuilder<string, string, string> wkt = WktBuilder.Instance;
+        IBuilder<string, string, string> wkt = WktBuilder.Instance;
         var w = wkt.BuildFeature(feature);
         w.Should().Contain("POINT");
 
         // KML
-        IGmlBuilder<XElement, XElement, XElement> kml = KmlBuilder.Instance;
+        IBuilder<XElement, XElement, XElement> kml = KmlBuilder.Instance;
         var k = kml.BuildFeature(feature);
         k.Name.LocalName.Should().Be("Placemark");
     }
@@ -100,21 +100,21 @@ public class IGmlBuilderTests
     [Fact]
     public void GeoJsonBuilder_AllGeometryTypes_ViaInterface()
     {
-        IGmlBuilder<JsonObject, JsonObject, JsonObject> b = GeoJsonBuilder.Instance;
+        IBuilder<JsonObject, JsonObject, JsonObject> b = GeoJsonBuilder.Instance;
         AssertAllGeometryMethodsNotNull(b);
     }
 
     [Fact]
     public void WktBuilder_AllGeometryTypes_ViaInterface()
     {
-        IGmlBuilder<string, string, string> b = WktBuilder.Instance;
+        IBuilder<string, string, string> b = WktBuilder.Instance;
         AssertAllGeometryMethodsNotNull(b);
     }
 
     [Fact]
     public void KmlBuilder_AllGeometryTypes_ViaInterface()
     {
-        IGmlBuilder<XElement, XElement, XElement> b = KmlBuilder.Instance;
+        IBuilder<XElement, XElement, XElement> b = KmlBuilder.Instance;
         AssertAllGeometryMethodsNotNull(b);
     }
 
@@ -139,7 +139,17 @@ public class IGmlBuilderTests
         act.Should().Throw<ArgumentNullException>();
     }
 
-    private static void AssertAllGeometryMethodsNotNull<TG, TF, TC>(IGmlBuilder<TG, TF, TC> b)
+    [Fact]
+    public void AllBuilders_BuildCoverage_ReturnsNull()
+    {
+        var coverage = new Gml4Net.Model.Coverage.GmlMultiPointCoverage();
+
+        GeoJsonBuilder.Instance.BuildCoverage(coverage).Should().BeNull();
+        KmlBuilder.Instance.BuildCoverage(coverage).Should().BeNull();
+        WktBuilder.Instance.BuildCoverage(coverage).Should().BeNull();
+    }
+
+    private static void AssertAllGeometryMethodsNotNull<TG, TF, TC>(IBuilder<TG, TF, TC> b)
     {
         var pt = new GmlPoint { Coordinate = new(1, 2) };
         var ls = new GmlLineString { Coordinates = [new(0, 0), new(1, 1)] };
