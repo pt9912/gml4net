@@ -295,8 +295,8 @@ git push origin Gml4Net.IO-v0.2.0
 
 ## Related Projects
 
-- [s-gml](https://github.com/niclas9912/s-gml) -- Original TypeScript implementation
-- [gml4dart](https://github.com/niclas9912/gml4dart) -- Dart port
+- [s-gml](https://github.com/pt9912/s-gml) -- Original TypeScript implementation
+- [gml4dart](https://github.com/pt9912/gml4dart) -- Dart port
 
 ## License
 
