@@ -248,6 +248,8 @@ public static class StreamingGml
                     });
                 }
             }
+
+            opts.Progress?.Report(new StreamingProgress(processed, failed, filtered));
         }
 
         return new StreamingResult

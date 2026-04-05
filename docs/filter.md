@@ -1,6 +1,6 @@
 # Feature-Filter fuer den Streaming-Pfad
 
-Status: Entwurf.
+Status: Implementiert.
 
 ## Motivation
 
@@ -165,7 +165,8 @@ var result = await StreamingGml.ParseAsync(
     feature => ProcessAsync(feature),
     options: new StreamingParserOptions
     {
-        Filter = f => f.Properties["status"] is GmlStringProperty { Value: "active" }
+        Filter = f => f.Properties.TryGetValue("status", out var v)
+                      && v is GmlStringProperty { Value: "active" }
     });
 
 // result.FeaturesProcessed -- nur aktive Features
