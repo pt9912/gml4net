@@ -243,7 +243,7 @@ git push origin Gml4Net.IO-v0.2.0
 - [Architecture](docs/architecture.md)
 - [Roadmap](docs/roadmap.md)
 - [Porting Design](docs/port2net.md)
-- [Parser Event Stream](docs/parser-event-stream.md)
+- [Streaming Parser](docs/streaming-parser.md)
 - [Releasing](docs/releasing.md)
 
 ## Related Projects

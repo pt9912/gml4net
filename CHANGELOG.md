@@ -91,5 +91,5 @@ Initial release covering all seven implementation phases.
 - Architecture document (`docs/architecture.md`)
 - Implementation roadmap (`docs/roadmap.md`)
 - Porting design (`docs/port2net.md`)
-- Parser event stream design (`docs/parser-event-stream.md`)
+- Streaming parser design (`docs/streaming-parser.md`)
 - Release process (`docs/releasing.md`)
